@@ -1,0 +1,87 @@
+{
+  "theme": "dark",
+  "archetype": "7 (Electric & Neon)",
+  "rationale": "The user requested a futuristic AI assistant with 'live glowing animations' keeping the dark theme and emerald green accents. This falls perfectly into the Electric & Neon archetype. We will use deep obsidian/indigo for the void and vibrant emerald for the cybernetic neon glows.",
+  "colors": {
+    "background": "#0A0C10",
+    "surface": "#12151C",
+    "surface_glass": "rgba(18, 21, 28, 0.6)",
+    "primary": "#10b981",
+    "primary_hover": "#34d399",
+    "primary_glow": "rgba(16, 185, 129, 0.3)",
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#94A3B8",
+    "border": "#1E293B",
+    "border_glow": "rgba(16, 185, 129, 0.4)"
+  },
+  "typography": {
+    "headings": {
+      "family": "Bricolage Grotesque",
+      "classes": "font-bold tracking-tight"
+    },
+    "body": {
+      "family": "Inter",
+      "classes": "leading-relaxed"
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "classes": "text-sm tracking-tight"
+    }
+  },
+  "spacing_and_layout": {
+    "sidebar": "w-[280px] shrink-0 border-r border-white/5 bg-[#0A0C10] flex flex-col transition-all duration-300",
+    "main_canvas": "flex-1 flex flex-col relative overflow-hidden bg-[#0A0C10]",
+    "chat_container": "max-w-4xl mx-auto w-full px-4 sm:px-8",
+    "composer_wrapper": "p-4 w-full max-w-4xl mx-auto bg-gradient-to-t from-[#0A0C10] via-[#0A0C10] to-transparent pt-12"
+  },
+  "visual_effects": {
+    "glassmorphism": "backdrop-blur-xl bg-surface_glass border border-white/5",
+    "neon_glow": "drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]",
+    "inner_glow": "shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]",
+    "gradient_text": "bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-500",
+    "animations": {
+      "pulse_orb": "animate-[pulse_4s_cubic-bezier(0.4,0,0.6,1)_infinite]",
+      "border_shimmer": "bg-[linear-gradient(110deg,#1e293b,45%,#10b981,55%,#1e293b)] bg-[length:200%_100%] animate-[shimmer_2s_infinite]"
+    }
+  },
+  "components": {
+    "sidebar_item": {
+      "default": "flex items-center gap-3 px-3 py-2 rounded-lg text-text_secondary hover:text-text_primary hover:bg-white/5 transition-colors cursor-pointer group",
+      "active": "flex items-center gap-3 px-3 py-2 rounded-lg text-primary bg-primary/10 transition-colors cursor-pointer border border-primary/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]",
+      "icon_classes": "w-5 h-5 group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all"
+    },
+    "chat_bubble": {
+      "user": "bg-surface border border-white/5 rounded-2xl rounded-tr-sm px-5 py-4 max-w-[85%] self-end",
+      "ai": "bg-transparent rounded-2xl px-5 py-4 max-w-[100%] self-start flex gap-4"
+    },
+    "composer": {
+      "wrapper": "relative rounded-2xl bg-surface border border-white/10 shadow-2xl focus-within:border-primary/50 focus-within:shadow-[0_0_30px_rgba(16,185,129,0.15)] transition-all duration-300",
+      "input": "w-full bg-transparent text-text_primary placeholder:text-text_secondary resize-none outline-none py-4 px-4 min-h-[56px] max-h-[200px]"
+    },
+    "mode_pill": {
+      "default": "px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 text-text_secondary hover:text-white transition-colors cursor-pointer flex items-center gap-2 bg-surface/50",
+      "active": "px-3 py-1.5 rounded-full text-xs font-medium border border-primary/30 text-primary bg-primary/10 shadow-[0_0_10px_rgba(16,185,129,0.2)] flex items-center gap-2 cursor-pointer"
+    }
+  },
+  "images": [
+    {
+      "category": "hero_orb",
+      "url": "https://static.prod-images.emergentagent.com/jobs/1f816d12-4d72-4207-a62b-5267f5aec05e/images/a94e8e07e78793574d82c2b714d0826e2394af6c2eb13afba4a9f935cb68887e.png",
+      "description": "Abstract cinematic glowing emerald green orb to be used as a background element or avatar in the hero state."
+    }
+  ],
+  "icons": {
+    "library": "lucide-react",
+    "instructions": "Use lucide-react for all standard icons (Sparkles, Search, Image, Apps, Plus, Send, Mic, Paperclip). Ensure icons within active areas carry a subtle glow via drop-shadow."
+  },
+  "instructions_to_main_agent": [
+    "Theme Foundation: Use #0A0C10 for the main app background, completely replacing default Vercel/Shadcn palettes.",
+    "Animations: Implement a glowing CSS border or Framer Motion wrapper for the composer when focused.",
+    "Hero State: Before chat begins, show 'What can I help you build today?' using the gradient_text utility, and feature a softly floating emerald orb (use the provided image or pure CSS radial-gradient orb with framer-motion float).",
+    "Sidebar: Recreate ChatGPT-like nav (New Chat, Search, Images, Apps, Deep Research) but inject the neon aesthetic. Active state should be emerald tinted.",
+    "Deep Research Mode: This should feel like a 'hacker mode' terminal, utilizing the JetBrains Mono font for reasoning steps and logs.",
+    "Streaming Backend: Connect all chat requests to 'ai.tetrific.com' as per user instruction. Implement token-by-token reveal.",
+    "Data-TestID: ALWAYS include 'data-testid' attributes (e.g., 'sidebar-new-chat', 'chat-input', 'chat-submit-btn') on interactive elements.",
+    "Auth: Implement Supabase Auth (Email/Password + Google) using a glassmorphic modal overlay."
+  ]
+}

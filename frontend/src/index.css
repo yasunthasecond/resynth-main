@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css");
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0a0c10;
+  color: #f8fafc;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.3);
+  color: #f8fafc;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
+
+.gradient-text {
+  background: linear-gradient(120deg, #34d399 0%, #10b981 50%, #059669 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Markdown */
+.md p { margin: 0 0 0.85em; line-height: 1.7; }
+.md p:last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; margin: 1.25em 0 0.6em; }
+.md h1 { font-size: 1.6rem; }
+.md h2 { font-size: 1.3rem; }
+.md h3 { font-size: 1.1rem; }
+.md ul, .md ol { padding-left: 1.4em; margin: 0.4em 0 0.9em; }
+.md li { margin: 0.25em 0; line-height: 1.7; }
+.md a { color: #34d399; text-decoration: underline; text-underline-offset: 3px; }
+.md code:not(pre code) {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #d4d4d8;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.88em;
+}
+.md pre {
+  background: #0d1117 !important;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.md blockquote {
+  border-left: 3px solid rgba(255,255,255,0.18);
+  padding: 0.2em 0 0.2em 1em;
+  color: #cbd5e1;
+  margin: 0.6em 0 1em;
+}
+.md table { border-collapse: collapse; margin: 0.6em 0; width: 100%; }
+.md th, .md td { border: 1px solid rgba(255,255,255,0.08); padding: 8px 12px; }
+.md th { background: rgba(255,255,255,0.04); }
+
+.caret::after {
+  content: "▍";
+  color: #10b981;
+  animation: caretBlink 1s steps(2) infinite;
+  margin-left: 1px;
+}
+@keyframes caretBlink { 50% { opacity: 0; } }
+
+/* KaTeX a bit smaller */
+.katex { font-size: 1.02em; }
+.katex-display { margin: 0.6em 0 !important; overflow-x: auto; overflow-y: hidden; }
