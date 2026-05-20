@@ -19,8 +19,6 @@ import {
   Paperclip,
   BookOpen,
   LogOut,
-  User as UserIcon,
-  CreditCard,
   Sparkles,
   Crown,
   AlertCircle,
@@ -74,8 +72,7 @@ async function authHeaders() {
   return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-// Local guest chats helpers — but per spec: guest mode doesn't save chats. We only keep current session in memory.
-const LOCAL_RECENT_KEY = "re_user_chats_cache";
+// Guest mode: chats are kept in memory only (not persisted).
 
 export default function App() {
   const [session, setSession] = useState(null);
