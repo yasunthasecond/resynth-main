@@ -379,8 +379,9 @@ async def chat_stream(
         "enable_search": True
     }
     
+    upstream_api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
     headers = {
-        "Authorization": f"Bearer {os.environ.get('DASHSCOPE_API_KEY')}",
+        "Authorization": f"Bearer {upstream_api_key}",
         "Content-Type": "application/json"
     }
 
