@@ -92,3 +92,49 @@ body {
 /* KaTeX a bit smaller */
 .katex { font-size: 1.02em; }
 .katex-display { margin: 0.6em 0 !important; overflow-x: auto; overflow-y: hidden; }
+
+/* Testimonial Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+  100% { transform: translateY(0px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes glowBorder {
+  0% { box-shadow: 0 0 10px rgba(255, 230, 0, 0.1); border-color: rgba(255, 230, 0, 0.5); }
+  50% { box-shadow: 0 0 25px rgba(255, 230, 0, 0.4); border-color: rgba(255, 230, 0, 1); }
+  100% { box-shadow: 0 0 10px rgba(255, 230, 0, 0.1); border-color: rgba(255, 230, 0, 0.5); }
+}
+.animate-glow-border {
+  animation: glowBorder 4s ease-in-out infinite;
+}
+
+@keyframes typeFade {
+  0% { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.animate-type-fade {
+  animation: typeFade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Force Clerk Text Colors */
+.cl-userButtonPopoverCard, .cl-userButtonPopoverCard * {
+  color: #f8fafc !important;
+}
+.cl-userButtonPopoverActionButtonIcon {
+  color: #94a3b8 !important;
+}
+.cl-userButtonPopoverActionButton:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+.cl-internal-b3al4t {
+  color: #f8fafc !important;
+}
+
+.cl-headerTitle, .cl-headerSubtitle, .cl-socialButtonsBlockButtonText, .cl-socialButtonsBlockButtonArrow, .cl-dividerText, .cl-formFieldLabel, .cl-footerActionText, .cl-internal-phfxlr { color: white !important; }
+.cl-headerSubtitle, .cl-dividerText, .cl-footerActionText { color: #94a3b8 !important; }
+.cl-socialButtonsBlockButton { background-color: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.08) !important; }
+.cl-internal-1dauvpw { filter: invert(1) !important; }

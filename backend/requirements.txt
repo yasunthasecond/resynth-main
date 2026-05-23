@@ -2,6 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 httpx==0.28.1
 python-dotenv==1.0.1
-supabase==2.30.0
+supabase==2.8.1
 reportlab==4.2.5
 python-multipart==0.0.12
+duckduckgo-search==6.3.7

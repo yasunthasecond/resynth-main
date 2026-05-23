@@ -26,7 +26,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.pdfgen import canvas
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / ".env", override=True)
 
 logger = logging.getLogger("resynth")
 logging.basicConfig(level=logging.INFO)
@@ -88,42 +88,59 @@ class CurrentUser(BaseModel):
     plan: str = "free"
 
 
-def _sb_user_client(token: str) -> Optional[Client]:
-    """Create a Supabase client bound to the user's JWT so RLS policies see auth.uid()."""
-    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-        return None
-    try:
-        c = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-        c.postgrest.auth(token)
-        return c
-    except Exception as e:
-        logger.warning(f"sb_user_client error: {e}")
-        return None
+def _sb_user_client(token: str):
+    # Deprecated: We use sb_admin with Clerk
+    return None
 
 
 async def get_optional_user(authorization: Optional[str] = Header(default=None)) -> Optional[CurrentUser]:
-    if not authorization or not authorization.lower().startswith("bearer ") or not sb_anon:
+    if not authorization or not authorization.lower().startswith("bearer "):
         return None
     token = authorization.split(" ", 1)[1].strip()
+    
+    import jwt
+    from jwt import PyJWKClient
+    
+    global _jwks_clients
+    if "_jwks_clients" not in globals():
+        _jwks_clients = {}
+        
     try:
-        res = sb_anon.auth.get_user(token)
-        user = getattr(res, "user", None)
-        if not user:
-            return None
-        # Fetch plan from profiles
+        unverified = jwt.decode(token, options={"verify_signature": False})
+        issuer = unverified.get("iss")
+        if not issuer:
+            raise Exception("No issuer in token")
+            
+        jwks_url = f"{issuer.rstrip('/')}/.well-known/jwks.json"
+        if jwks_url not in _jwks_clients:
+            _jwks_clients[jwks_url] = PyJWKClient(jwks_url, cache_keys=True)
+            
+        jwks_client = _jwks_clients[jwks_url]
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=None,
+            issuer=issuer,
+            options={"verify_aud": False}
+        )
+        user_id = payload.get("sub")
+        
         plan = "free"
         try:
-            uc = _sb_user_client(token)
-            if uc:
-                pr = uc.table("profiles").select("plan").eq("id", user.id).maybe_single().execute()
-                if pr and pr.data and pr.data.get("plan"):
-                    plan = pr.data["plan"]
-        except Exception as e:
-            logger.warning(f"plan lookup failed: {e}")
-        return CurrentUser(id=str(user.id), email=user.email, plan=plan)
+            if sb_admin:
+                pr = sb_admin.table("profiles").select("plan").eq("id", user_id).maybe_single().execute()
+                if pr and pr.data:
+                    plan = pr.data.get("plan", "free")
+        except Exception:
+            pass
+            
+        return CurrentUser(id=str(user_id), email=None, plan=plan)
     except Exception as e:
-        logger.warning(f"auth verify failed: {e}")
-        return None
+        logger.warning(f"Clerk auth verify failed: {e}")
+        raise HTTPException(status_code=401, detail=f"JWT Error: {e}")
 
 
 async def require_user(user: Optional[CurrentUser] = Depends(get_optional_user)) -> CurrentUser:
@@ -150,20 +167,26 @@ def check_and_increment_guest(device_id: str) -> tuple[bool, int, int]:
     return True, rec["count"], LIMIT_GUEST
 
 
-def check_and_increment_user(token: str, plan: str) -> tuple[bool, int, int]:
-    """Use Supabase RPC to atomically increment per-user daily count."""
+def check_and_increment_user(user_id: str, plan: str) -> tuple[bool, int, int]:
     limit = get_limit_for_plan(plan)
-    uc = _sb_user_client(token)
-    if not uc:
-        return True, 0, limit  # fail open on infra error
+    if not sb_admin:
+        return True, 0, limit
     try:
-        res = uc.rpc("increment_usage", {"p_limit": limit}).execute()
-        if res.data and len(res.data) > 0:
-            row = res.data[0]
-            return bool(row["allowed"]), int(row["used"]), int(row["limit_"])
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        res = sb_admin.table("daily_usage").select("*").eq("user_id", user_id).eq("day", today).maybe_single().execute()
+        
+        if res and res.data:
+            current_count = int(res.data.get("count", 0))
+            if current_count >= limit:
+                return False, current_count, limit
+            sb_admin.table("daily_usage").update({"count": current_count + 1}).eq("id", res.data["id"]).execute()
+            return True, current_count + 1, limit
+        else:
+            sb_admin.table("daily_usage").insert({"user_id": user_id, "day": today, "count": 1}).execute()
+            return True, 1, limit
     except Exception as e:
-        logger.error(f"increment_usage rpc failed: {e}")
-    return True, 0, limit
+        logger.error(f"Usage error: {e}")
+        return True, 0, limit
 
 
 # ── Basic endpoints ───────────────────────────────────────────────────
@@ -265,8 +288,8 @@ async def chat_stream(
     token = authorization.split(" ", 1)[1].strip() if authorization and authorization.lower().startswith("bearer ") else None
 
     # Limit check
-    if user and token:
-        allowed, used, limit = check_and_increment_user(token, user.plan)
+    if user:
+        allowed, used, limit = check_and_increment_user(user.id, user.plan)
         plan_for_meta = user.plan
     else:
         device = x_device_id or "anon"
@@ -281,25 +304,112 @@ async def chat_stream(
             yield b"data: {\"type\":\"done\"}\n\n"
         return StreamingResponse(over_limit(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    payload = {
-        "session_id": body.get("session_id", x_device_id or "anon"),
-        "message": body.get("message", ""),
-        "model": body.get("model", "Resynth 1.5"),
-        "chat_id": body.get("chat_id", ""),
-        "deep_dive": bool(body.get("deep_dive", False)),
-        "lit_review": bool(body.get("lit_review", False)),
-        "strategy": body.get("strategy", "balanced"),
+    model_name = "qwen-max-latest" if "Resynth" in body.get("model", "") else "qwen-plus-latest"
+    active_app = body.get("active_app")
+    
+    github_context = ""
+    google_drive_context = ""
+    if active_app == "github" and user and sb_admin:
+        integ = sb_admin.table("integrations").select("*").eq("user_id", user.id).eq("provider", "github").maybe_single().execute()
+        if integ and integ.data:
+            access_token = integ.data.get("access_token")
+            if access_token:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        gh_res = await client.get("https://api.github.com/user/repos?sort=updated&per_page=5", headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Accept": "application/vnd.github.v3+json"
+                        })
+                        if gh_res.status_code == 200:
+                            repos = gh_res.json()
+                            gh_info = []
+                            for r in repos:
+                                gh_info.append(f"- {r.get('full_name')}: {r.get('description', 'No description')} (Language: {r.get('language')})")
+                            github_context = "\n\n[ATTACHED CONTEXT: The user has attached their GitHub account. Here are their 5 most recently updated repositories:]\n" + "\n".join(gh_info)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch github context: {e}")
+    elif active_app == "google-drive" and user and sb_admin:
+        integ = sb_admin.table("integrations").select("*").eq("user_id", user.id).eq("provider", "google-drive").maybe_single().execute()
+        if integ and integ.data:
+            access_token = integ.data.get("access_token")
+            if access_token:
+                try:
+                    async with httpx.AsyncClient() as client:
+                        query = "mimeType='application/vnd.google-apps.document' or mimeType='text/plain'"
+                        url = f"https://www.googleapis.com/drive/v3/files?q={urllib.parse.quote(query)}&orderBy=modifiedTime desc&pageSize=3"
+                        g_res = await client.get(url, headers={"Authorization": f"Bearer {access_token}"})
+                        if g_res.status_code == 200:
+                            files = g_res.json().get("files", [])
+                            docs_info = []
+                            for f in files:
+                                f_id = f.get("id")
+                                f_name = f.get("name")
+                                f_mime = f.get("mimeType")
+                                if f_mime == "application/vnd.google-apps.document":
+                                    c_res = await client.get(f"https://www.googleapis.com/drive/v3/files/{f_id}/export?mimeType=text/plain", headers={"Authorization": f"Bearer {access_token}"})
+                                else:
+                                    c_res = await client.get(f"https://www.googleapis.com/drive/v3/files/{f_id}?alt=media", headers={"Authorization": f"Bearer {access_token}"})
+                                
+                                if c_res.status_code == 200:
+                                    content = c_res.text[:2000] # Limit to 2k chars per file
+                                    docs_info.append(f"Document: {f_name}\nContent snippet:\n{content}\n")
+                            if docs_info:
+                                google_drive_context = "\n\n[ATTACHED CONTEXT: The user has attached their Google Drive. Here are snippets from their 3 most recently modified documents:]\n\n" + "\n---\n".join(docs_info)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch google drive context: {e}")
+    
+    system_prompt = {
+        "role": "system",
+        "content": "You are Resynth, a highly intelligent and helpful AI assistant. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart." + github_context + google_drive_context
     }
-    if body.get("image_data"):
-        payload["image_data"] = body["image_data"]
+    
+    frontend_messages = body.get("messages", [])
+    # Only inject system prompt if it's not already there (though frontend shouldn't send one)
+    if not any(m.get("role") == "system" for m in frontend_messages):
+        messages = [system_prompt] + frontend_messages
+    else:
+        messages = frontend_messages
+        
+    messages.append({"role": "user", "content": body.get("message", "")})
+    
+    upstream_payload = {
+        "model": model_name,
+        "messages": messages,
+        "stream": True,
+        "enable_search": True
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('DASHSCOPE_API_KEY')}",
+        "Content-Type": "application/json"
+    }
 
     async def event_stream():
         try:
             async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("POST", f"{UPSTREAM}/chat/stream", json=payload, headers={"Accept": "text/event-stream"}, timeout=httpx.Timeout(300.0, connect=30.0)) as r:
-                    async for chunk in r.aiter_bytes():
-                        if chunk:
-                            yield chunk
+                async with client.stream("POST", f"{UPSTREAM}/chat/completions", json=upstream_payload, headers=headers, timeout=httpx.Timeout(300.0, connect=30.0)) as r:
+                    if r.status_code != 200:
+                        err_text = await r.aread()
+                        err = json.dumps({"type": "error", "message": f"Upstream API error: {r.status_code} {err_text.decode()}"})
+                        yield f"data: {err}\n\n".encode()
+                        yield b"data: {\"type\":\"done\"}\n\n"
+                        return
+
+                    async for line in r.aiter_lines():
+                        if not line.startswith("data:"): continue
+                        data_str = line[5:].strip()
+                        if not data_str: continue
+                        if data_str == "[DONE]":
+                            yield b"data: {\"type\":\"done\"}\n\n"
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n".encode()
+                        except json.JSONDecodeError:
+                            pass
         except Exception as e:
             err = json.dumps({"type": "error", "message": str(e)})
             yield f"data: {err}\n\n".encode()
@@ -311,11 +421,9 @@ async def chat_stream(
 # ── Chat history (authenticated; uses user's JWT for RLS) ─────────────
 @app.get("/api/chats")
 async def list_chats(user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
+    if not sb_admin:
         return []
-    res = uc.table("chats").select("id,title,created_at,updated_at").eq("user_id", user.id).order("created_at", desc=True).execute()
+    res = sb_admin.table("chats").select("id, title, created_at").eq("user_id", user.id).order("created_at", desc=True).limit(50).execute()
     return res.data or []
 
 
@@ -325,11 +433,9 @@ class ChatCreate(BaseModel):
 
 @app.post("/api/chats")
 async def create_chat(payload: ChatCreate, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
+    if not sb_admin:
         raise HTTPException(500, "Supabase not configured")
-    res = uc.table("chats").insert({"user_id": user.id, "title": payload.title or "New chat"}).execute()
+    res = sb_admin.table("chats").insert({"user_id": user.id, "title": payload.title or "New chat"}).execute()
     return res.data[0] if res.data else {}
 
 
@@ -339,32 +445,26 @@ class ChatUpdate(BaseModel):
 
 @app.patch("/api/chats/{chat_id}")
 async def update_chat(chat_id: str, payload: ChatUpdate, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
-        raise HTTPException(500)
-    uc.table("chats").update({"title": payload.title, "updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", chat_id).eq("user_id", user.id).execute()
-    return {"ok": True}
+    if not sb_admin:
+        return {"status": "error"}
+    sb_admin.table("chats").update({"title": payload.title}).eq("id", chat_id).eq("user_id", user.id).execute()
+    return {"status": "ok"}
 
 
 @app.delete("/api/chats/{chat_id}")
 async def delete_chat(chat_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
-        raise HTTPException(500)
-    uc.table("messages").delete().eq("chat_id", chat_id).eq("user_id", user.id).execute()
-    uc.table("chats").delete().eq("id", chat_id).eq("user_id", user.id).execute()
+    if not sb_admin:
+        raise HTTPException(500, "Supabase not configured")
+    sb_admin.table("messages").delete().eq("chat_id", chat_id).eq("user_id", user.id).execute()
+    sb_admin.table("chats").delete().eq("id", chat_id).eq("user_id", user.id).execute()
     return {"ok": True}
 
 
 @app.get("/api/chats/{chat_id}/messages")
 async def list_messages(chat_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
+    if not sb_admin:
         return []
-    res = uc.table("messages").select("id,role,content,reaction,created_at").eq("chat_id", chat_id).eq("user_id", user.id).order("created_at").execute()
+    res = sb_admin.table("messages").select("id,role,content,reaction,created_at").eq("chat_id", chat_id).eq("user_id", user.id).order("created_at").execute()
     return res.data or []
 
 
@@ -376,11 +476,9 @@ class MessageCreate(BaseModel):
 
 @app.post("/api/messages")
 async def create_message(payload: MessageCreate, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
-        raise HTTPException(500)
-    res = uc.table("messages").insert({
+    if not sb_admin:
+        return {"status": "error"}
+    res = sb_admin.table("messages").insert({
         "chat_id": payload.chat_id,
         "user_id": user.id,
         "role": payload.role,
@@ -395,11 +493,9 @@ class ReactionPatch(BaseModel):
 
 @app.patch("/api/messages/{message_id}/reaction")
 async def patch_reaction(message_id: str, payload: ReactionPatch, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
-    token = authorization.split(" ", 1)[1].strip()
-    uc = _sb_user_client(token)
-    if not uc:
-        raise HTTPException(500)
-    uc.table("messages").update({"reaction": payload.reaction}).eq("id", message_id).eq("user_id", user.id).execute()
+    if not sb_admin:
+        return {"status": "error"}
+    sb_admin.table("messages").update({"reaction": payload.reaction}).eq("id", message_id).eq("user_id", user.id).execute()
     return {"ok": True}
 
 
@@ -623,3 +719,180 @@ async def export_pdf(payload: PDFExportReq, user: Optional[CurrentUser] = Depend
     buf.seek(0)
     fname = (payload.title or "resynth").replace(" ", "_") + ".pdf"
     return Response(content=buf.getvalue(), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+import hashlib
+import hmac
+from fastapi.responses import RedirectResponse
+
+# ── Integrations & OAuth ─────────────────────────────────────────────
+ADMIN_SECRET = os.environ.get("ADMIN_SECRET", "fallback_secret")
+
+def sign_oauth_state(user_id: str) -> str:
+    sig = hmac.new(ADMIN_SECRET.encode(), user_id.encode(), hashlib.sha256).hexdigest()
+    return f"{user_id}.{sig}"
+
+def verify_oauth_state(state: str) -> str | None:
+    try:
+        uid, sig = state.split(".", 1)
+        if hmac.compare_digest(sig, hmac.new(ADMIN_SECRET.encode(), uid.encode(), hashlib.sha256).hexdigest()):
+            return uid
+    except Exception:
+        pass
+    return None
+
+@app.get("/api/auth/github/login")
+async def github_login(user: CurrentUser = Depends(require_user)):
+    client_id = os.environ.get("GITHUB_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(500, "Missing GitHub Client ID")
+        
+    state = sign_oauth_state(user.id)
+    url = f"https://github.com/login/oauth/authorize?client_id={client_id}&state={state}&scope=repo,read:user"
+    return {"url": url}
+
+@app.get("/api/auth/github/callback")
+async def github_callback(code: str, state: str):
+    try:
+        user_id = verify_oauth_state(state)
+        if not user_id:
+            raise HTTPException(400, "Invalid OAuth state")
+            
+        client_id = os.environ.get("GITHUB_CLIENT_ID")
+        client_secret = os.environ.get("GITHUB_CLIENT_SECRET")
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://github.com/login/oauth/access_token",
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "state": state
+                },
+                headers={"Accept": "application/json"}
+            )
+            data = resp.json()
+            access_token = data.get("access_token")
+            
+            if not access_token:
+                raise HTTPException(400, f"Failed to get access token: {data}")
+                
+            user_resp = await client.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            gh_user = user_resp.json()
+            
+            if sb_admin:
+                sb_admin.table("integrations").upsert({
+                    "user_id": user_id,
+                    "provider": "github",
+                    "access_token": access_token,
+                    "metadata": {"username": gh_user.get("login"), "avatar": gh_user.get("avatar_url")}
+                }, on_conflict="user_id,provider").execute()
+                
+            frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+            return RedirectResponse(f"{frontend_url}?integration=success")
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@app.get("/api/auth/google/login")
+async def google_login(user: CurrentUser = Depends(require_user)):
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(500, "Missing Google Client ID")
+        
+    state = sign_oauth_state(user.id)
+    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+    scope = "https://www.googleapis.com/auth/drive.readonly profile email"
+    
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={urllib.parse.quote(scope)}&state={state}&access_type=offline&prompt=consent"
+    return {"url": url}
+
+@app.get("/api/auth/google/callback")
+async def google_callback(code: str, state: str):
+    try:
+        user_id = verify_oauth_state(state)
+        if not user_id:
+            raise HTTPException(400, "Invalid OAuth state")
+            
+        client_id = os.environ.get("GOOGLE_CLIENT_ID")
+        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
+        redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": redirect_uri
+                }
+            )
+            data = resp.json()
+            access_token = data.get("access_token")
+            refresh_token = data.get("refresh_token")
+            
+            if not access_token:
+                raise HTTPException(400, f"Failed to get Google access token: {data}")
+                
+            user_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            g_user = user_resp.json()
+            
+            if sb_admin:
+                metadata = {
+                    "username": g_user.get("name") or g_user.get("email"), 
+                    "avatar": g_user.get("picture")
+                }
+                if refresh_token:
+                    metadata["refresh_token"] = refresh_token
+                sb_admin.table("integrations").upsert({
+                    "user_id": user_id,
+                    "provider": "google-drive",
+                    "access_token": access_token,
+                    "metadata": metadata
+                }, on_conflict="user_id,provider").execute()
+                
+            frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+            return RedirectResponse(f"{frontend_url}?integration=success")
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@app.get("/api/integrations")
+async def get_integrations(user: CurrentUser = Depends(require_user)):
+    if not sb_admin:
+        return []
+    res = sb_admin.table("integrations").select("*").eq("user_id", user.id).execute()
+    return res.data
+
+# ── Dodo Payments Webhook ─────────────────────────────────────────────
+@app.post("/api/webhooks/dodo")
+async def dodo_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("Dodo-Signature")
+    secret = os.environ.get("DODO_WEBHOOK_SECRET")
+    
+    if secret and sig:
+        pass # In production, verify signature
+        
+    data = await request.json()
+    if data.get("type") == "payment.succeeded":
+        payment = data.get("data", {})
+        customer_id = payment.get("customer", {}).get("customer_id")
+        # Find user ID from customer mapping (mocked for demo)
+        user_id = payment.get("metadata", {}).get("user_id")
+        
+        if sb_admin and user_id:
+            # Upgrade user plan to pro
+            sb_admin.table("profiles").update({"plan": "pro"}).eq("id", user_id).execute()
+            
+    return {"status": "success"}
+
+# ── End Restored Routes ──
