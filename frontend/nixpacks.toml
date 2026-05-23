@@ -1,0 +1,5 @@
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["CI=false GENERATE_SOURCEMAP=false npm run build"]
