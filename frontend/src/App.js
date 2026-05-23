@@ -1639,11 +1639,12 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
 
   const handleConnect = async (slug) => {
     if (!isAuthed) return onRequireAuth();
+    if (slug !== "github" && slug !== "google-drive") return alert("This integration is not supported yet.");
     
     setConnecting(slug);
     try {
       const headers = await authHeaders();
-      const providerAuth = slug === "google-drive" ? "google" : slug;
+      const providerAuth = slug === "google-drive" ? "google" : "github";
       const res = await fetch(`${API}/auth/${providerAuth}/login`, { headers });
       const data = await res.json();
       if (data.url) {
