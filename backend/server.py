@@ -31,7 +31,7 @@ load_dotenv(ROOT_DIR / ".env", override=True)
 logger = logging.getLogger("resynth")
 logging.basicConfig(level=logging.INFO)
 
-UPSTREAM = os.environ["UPSTREAM_BASE_URL"]
+UPSTREAM = os.environ.get("UPSTREAM_BASE_URL", "https://api.openai.com/v1")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or SUPABASE_ANON_KEY
