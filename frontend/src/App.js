@@ -900,7 +900,7 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
     <div className="flex-1 flex flex-col min-h-0 relative">
       <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-scroll">
         {empty ? (
-          <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} user={user} />
+          <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} />
         ) : (
           <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 pt-8 pb-44 flex flex-col gap-5">
             {messages.map((m, i) => (
@@ -925,8 +925,9 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
   );
 }
 
-function Hero({ onPick, isResearchMode, user }) {
+function Hero({ onPick, isResearchMode }) {
   const [topicIndex, setTopicIndex] = useState(0);
+  const { user } = useUser();
   
   const topics = [
     "What are we exploring?",
