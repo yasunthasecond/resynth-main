@@ -949,7 +949,7 @@ function Hero({ onPick, isResearchMode }) {
             key={i}
             data-testid={`suggestion-${i}`}
             onClick={() => onPick(s)}
-            className="text-left px-4 py-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12] transition-colors text-[13.5px] text-textSecondary hover:text-white"
+            className="text-left px-4 py-3.5 rounded-xl border border-white bg-transparent hover:bg-white/[0.1] transition-colors text-[13.5px] text-white"
             style={{ animation: `fadeUp 0.4s ${i * 0.06}s both` }}
           >
             {s}
