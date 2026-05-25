@@ -14,8 +14,9 @@ module.exports = {
         textSecondary: "#94A3B8",
       },
       fontFamily: {
+        sans: ["Bricolage Grotesque", "system-ui", "sans-serif"],
         display: ["Bricolage Grotesque", "system-ui", "sans-serif"],
-        body: ["Inter", "system-ui", "sans-serif"],
+        body: ["Bricolage Grotesque", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       keyframes: {

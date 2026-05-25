@@ -853,12 +853,12 @@ function TopBar({ plan, onToggleSidebar, sidebarOpen, isAuthed, onShowAuth, onSh
         )}
         {isAuthed ? (
           plan === "free" && (
-            <button data-testid="topbar-upgrade" onClick={onShowPricing} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-[#0A0C10] hover:bg-emerald-400 transition-colors">
+            <button data-testid="topbar-upgrade" onClick={onShowPricing} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
               Upgrade
             </button>
           )
         ) : (
-          <button data-testid="topbar-signin" onClick={onShowAuth} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-[#0A0C10] hover:bg-white/90 transition-colors">
+          <button data-testid="topbar-signin" onClick={onShowAuth} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
             Sign in
           </button>
         )}
@@ -900,7 +900,7 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
     <div className="flex-1 flex flex-col min-h-0 relative">
       <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-scroll">
         {empty ? (
-          <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} />
+          <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} user={user} />
         ) : (
           <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 pt-8 pb-44 flex flex-col gap-5">
             {messages.map((m, i) => (
@@ -925,37 +925,30 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
   );
 }
 
-function Hero({ onPick, isResearchMode }) {
-  const SUGGESTIONS = [
-    "Explain how the Riemann hypothesis matters",
-    "Solve: ∫ x² sin(x) dx step by step",
-    "Compare React Server Components vs Islands",
-    "Draft a one-page business plan for a coffee cart",
+function Hero({ onPick, isResearchMode, user }) {
+  const [topicIndex, setTopicIndex] = useState(0);
+  
+  const topics = [
+    "What are we exploring?",
+    "What are we getting into?",
+    ...(user ? [`Hey, ${user.firstName || user.fullName || 'there'}!`] : [])
   ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTopicIndex(prev => (prev + 1) % topics.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [topics.length]);
+
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-4 py-12 animate-fadeUp">
-      <div className="w-16 h-16 rounded-2xl bg-white/[0.02] border border-white/[0.08] flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
-        <img src="/logo.png" alt="Resynth" className="w-10 h-10 rounded-lg" />
-      </div>
-      <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2">
-        {isResearchMode ? "Deep " : "What "}<span className="gradient-text">{isResearchMode ? "Research" : "are you exploring"}</span>{isResearchMode ? " Lab" : " today?"}
+      <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2 h-[48px] flex items-center transition-all duration-500">
+        {isResearchMode ? "Deep " : ""}<span className="gradient-text">{isResearchMode ? "Research Lab" : topics[topicIndex]}</span>
       </h1>
       <p className="text-sm sm:text-base text-textSecondary text-center max-w-md mb-8">
         {isResearchMode ? "Multi-step research with citations." : "Ask anything. Resynth streams answers live."}
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-2xl w-full">
-        {SUGGESTIONS.map((s, i) => (
-          <button
-            key={i}
-            data-testid={`suggestion-${i}`}
-            onClick={() => onPick(s)}
-            className="text-left px-4 py-3.5 rounded-xl border border-white bg-transparent hover:bg-white/[0.1] transition-colors text-[13.5px] text-white"
-            style={{ animation: `fadeUp 0.4s ${i * 0.06}s both` }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1144,7 +1137,7 @@ function QuotaCard({ info, plan, onUpgrade }) {
       </p>
       <div className="font-mono text-[28px] tracking-tight text-white tabular-nums mb-3" data-testid="quota-countdown">{remaining}</div>
       {plan !== "elite" && (
-        <button onClick={onUpgrade} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-semibold bg-emerald-500 text-[#0A0C10] hover:bg-emerald-400">
+        <button onClick={onUpgrade} className="btn-transparent px-3 py-1.5 rounded-lg text-[12.5px] font-semibold">
           <Crown className="w-3.5 h-3.5" /> Upgrade for higher limits
         </button>
       )}
@@ -1598,7 +1591,7 @@ function PricingModal({ onClose, isAuthed, authHeaders, billing, onRequireAuth }
                   <div className="space-y-1.5">
                     <div className="w-full text-center py-2.5 rounded-lg text-[13px] font-semibold bg-white/[0.04] border border-white/[0.07] text-white">Current plan</div>
                     {isUpgrade && (
-                      <button data-testid={`manage-${p.id}`} onClick={openPortal} className="w-full py-2.5 rounded-lg text-[13px] font-medium bg-transparent text-textSecondary hover:text-white border border-white/[0.07] hover:border-white/[0.14] flex items-center justify-center gap-1.5">
+                      <button data-testid={`manage-${p.id}`} onClick={openPortal} className="btn-transparent w-full py-2.5 rounded-lg text-[13px] font-medium">
                         <ExternalLink className="w-3.5 h-3.5" /> Manage subscription
                       </button>
                     )}

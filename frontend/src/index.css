@@ -137,4 +137,23 @@ body {
 .cl-headerTitle, .cl-headerSubtitle, .cl-socialButtonsBlockButtonText, .cl-socialButtonsBlockButtonArrow, .cl-dividerText, .cl-formFieldLabel, .cl-footerActionText, .cl-internal-phfxlr { color: white !important; }
 .cl-headerSubtitle, .cl-dividerText, .cl-footerActionText { color: #94a3b8 !important; }
 .cl-socialButtonsBlockButton { background-color: rgba(255,255,255,0.03) !important; border-color: rgba(255,255,255,0.08) !important; }
+
+@layer utilities {
+  .btn-transparent {
+    @apply border border-white bg-transparent text-white transition-all flex items-center justify-center gap-1.5 relative overflow-hidden;
+  }
+  .btn-transparent span {
+    @apply transition-transform duration-300;
+  }
+  .btn-transparent::after {
+    content: "→";
+    @apply absolute right-0 opacity-0 transform translate-x-4 transition-all duration-300 font-sans;
+  }
+  .btn-transparent:hover {
+    @apply bg-white/[0.1] pr-7;
+  }
+  .btn-transparent:hover::after {
+    @apply opacity-100 translate-x-[-12px];
+  }
+}
 .cl-internal-1dauvpw { filter: invert(1) !important; }
