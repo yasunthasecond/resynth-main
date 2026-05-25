@@ -304,7 +304,11 @@ async def chat_stream(
             yield b"data: {\"type\":\"done\"}\n\n"
         return StreamingResponse(over_limit(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    model_name = "qwen-max-latest" if "Resynth" in body.get("model", "") else "qwen-plus-latest"
+    image_data = body.get("image_data")
+    if image_data:
+        model_name = "qwen-vl-max-latest"
+    else:
+        model_name = "qwen-max-latest" if "Resynth" in body.get("model", "") else "qwen-plus-latest"
     active_app = body.get("active_app")
     
     github_context = ""
@@ -360,7 +364,7 @@ async def chat_stream(
     
     system_prompt = {
         "role": "system",
-        "content": "You are Resynth, a highly intelligent and helpful AI assistant. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart." + github_context + google_drive_context
+        "content": "You are Resynth, a highly intelligent and helpful AI assistant. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people. NEVER hallucinate or invent information. If you don't know something, state that clearly. You are also familiar with modern internet culture and slang like 'wyd', 'lol', 'fr', etc. and can use them naturally when appropriate." + github_context + google_drive_context
     }
     
     frontend_messages = body.get("messages", [])
@@ -370,7 +374,17 @@ async def chat_stream(
     else:
         messages = frontend_messages
         
-    messages.append({"role": "user", "content": body.get("message", "")})
+    user_msg_content = body.get("message", "")
+    if image_data:
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": user_msg_content},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+            ]
+        })
+    else:
+        messages.append({"role": "user", "content": user_msg_content})
     
     upstream_payload = {
         "model": model_name,
