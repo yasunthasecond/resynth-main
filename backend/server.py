@@ -314,7 +314,7 @@ async def chat_stream(
     if image_data:
         model_name = "qwen-vl-max-latest"
     else:
-        model_name = "qwen-max-latest" if "Resynth" in body.get("model", "") else "qwen-plus-latest"
+        model_name = "deepseek-v4-pro"
     active_app = body.get("active_app")
     
     user_memory_raw = body.get("user_memory")
