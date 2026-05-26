@@ -483,8 +483,32 @@ export default function App() {
             if (!payload) continue;
             try {
               const evt = JSON.parse(payload);
-              if (evt.type === "token" && (evt.text || evt.content)) { accText += (evt.text || evt.content); updateAI({ content: accText, status: null }); }
-              else if (evt.type === "text" && evt.content) { accText = evt.content; updateAI({ content: accText, status: null }); }
+              if (evt.type === "token" && (evt.text || evt.content)) { 
+                accText += (evt.text || evt.content); 
+                
+                const memoryMatch = accText.match(/<SAVE_MEMORY>([\s\S]*?)<\/SAVE_MEMORY>/);
+                if (memoryMatch) {
+                    const newFact = memoryMatch[1].trim();
+                    if (newFact) {
+                        try {
+                            const raw = localStorage.getItem("re_memory");
+                            let arr = [];
+                            if (raw && !raw.startsWith("[")) { arr = [{id: Date.now().toString(), text: raw}]; }
+                            else { arr = raw ? JSON.parse(raw) : []; }
+                            arr.push({id: Date.now().toString(), text: newFact});
+                            localStorage.setItem("re_memory", JSON.stringify(arr));
+                        } catch {}
+                    }
+                    accText = accText.replace(/<SAVE_MEMORY>[\s\S]*?<\/SAVE_MEMORY>/g, "");
+                }
+                const displayContent = accText.replace(/<SAVE_MEMORY>[\s\S]*/g, "");
+                updateAI({ content: displayContent, status: null }); 
+              }
+              else if (evt.type === "text" && evt.content) { 
+                  accText = evt.content; 
+                  const displayContent = accText.replace(/<SAVE_MEMORY>[\s\S]*?<\/SAVE_MEMORY>/g, "").replace(/<SAVE_MEMORY>[\s\S]*/g, "");
+                  updateAI({ content: displayContent, status: null }); 
+              }
               else if (evt.type === "status") { updateAI({ status: evt.message }); }
               else if (evt.type === "sources") { updateAI({ sources: evt }); }
               else if (evt.type === "image_url") { updateAI({ imageUrl: evt.url }); }
@@ -1728,13 +1752,34 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
 // Memory View
 // ────────────────────────────────────────────────────────────────────────────
 function MemoryView() {
-  const [memory, setMemory] = useState(() => localStorage.getItem("re_memory") || "");
-  const [saved, setSaved] = useState(false);
+  const [memories, setMemories] = useState(() => {
+    try {
+      const raw = localStorage.getItem("re_memory");
+      if (raw && !raw.startsWith("[")) {
+        const migrated = [{ id: Date.now().toString(), text: raw }];
+        localStorage.setItem("re_memory", JSON.stringify(migrated));
+        return migrated;
+      }
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [draft, setDraft] = useState("");
 
-  const save = () => {
-    localStorage.setItem("re_memory", memory);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const saveMemories = (newMemories) => {
+    setMemories(newMemories);
+    localStorage.setItem("re_memory", JSON.stringify(newMemories));
+  };
+
+  const addMemory = () => {
+    if (!draft.trim()) return;
+    saveMemories([...memories, { id: Date.now().toString(), text: draft.trim() }]);
+    setDraft("");
+  };
+
+  const deleteMemory = (id) => {
+    saveMemories(memories.filter((m) => m.id !== id));
   };
 
   return (
@@ -1744,18 +1789,32 @@ function MemoryView() {
         <p className="text-textSecondary mb-10">What should Resynth know about you to provide better, more personalized answers?</p>
 
         <div className="flex flex-col gap-4 max-w-2xl">
-          <textarea
-            value={memory}
-            onChange={(e) => setMemory(e.target.value)}
-            placeholder="e.g. I am a React developer. Always write code in TypeScript. Keep answers concise."
-            className="w-full h-48 bg-[#12151C] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl p-4 text-[14px] text-textPrimary placeholder:text-textSecondary/50 resize-none outline-none transition-colors"
-          />
-          <button
-            onClick={save}
-            className="self-end px-6 py-2 bg-white text-black rounded-lg text-[13px] font-medium hover:bg-white/90 transition-colors flex items-center gap-2"
-          >
-            {saved ? <><Check className="w-4 h-4" /> Saved</> : "Save Memory"}
-          </button>
+          <div className="flex gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addMemory()}
+              placeholder="e.g. I am a React developer."
+              className="flex-1 bg-[#12151C] border border-white/[0.08] focus:border-emerald-500/50 rounded-xl px-4 py-3 text-[14px] text-textPrimary placeholder:text-textSecondary/50 outline-none transition-colors"
+            />
+            <button onClick={addMemory} className="px-6 py-2 bg-white text-black rounded-lg text-[13px] font-medium hover:bg-white/90 transition-colors">
+              Add
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 mt-4">
+            {memories.map((m) => (
+              <div key={m.id} className="flex items-center justify-between bg-white/[0.03] border border-white/[0.05] rounded-lg p-4 group">
+                <span className="text-[14px] text-textPrimary/90">{m.text}</span>
+                <button onClick={() => deleteMemory(m.id)} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-white/[0.08] rounded text-textSecondary hover:text-red-400 transition-all">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {memories.length === 0 && (
+              <div className="text-center py-8 text-textSecondary/50 text-[13px]">No memories saved yet. The AI can also auto-save memories here during conversation!</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
