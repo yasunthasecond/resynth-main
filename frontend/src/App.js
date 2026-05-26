@@ -1497,7 +1497,9 @@ function AuthPage({ onClose }) {
             <h2 className="text-3xl font-display font-bold text-white mb-2">Welcome back</h2>
             <p className="text-textSecondary text-[15px]">Sign in to access your intelligence tools.</p>
           </div>
-          <SignIn routing="hash" />
+          <div className="flex justify-center w-full">
+            <SignIn routing="hash" />
+          </div>
         </div>
       </div>
       <div className="hidden lg:block lg:w-1/2 relative bg-[#111111] border-l border-white/[0.04]">
