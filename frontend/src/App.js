@@ -951,25 +951,52 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
 
 function Hero({ onPick, isResearchMode }) {
   const [topicIndex, setTopicIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useUser();
   
-  const topics = [
+  // Memoize topics so the effect doesn't trigger on every render if topics array is recreated inline
+  const topics = useMemo(() => [
     "What are we exploring?",
     "What are we getting into?",
     ...(user ? [`Hey, ${user.firstName || user.fullName || 'there'}!`] : [])
-  ];
+  ], [user]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTopicIndex(prev => (prev + 1) % topics.length);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [topics.length]);
+    let timeout;
+    const currentTopic = topics[topicIndex];
+    
+    if (isDeleting) {
+      if (displayedText.length > 0) {
+        timeout = setTimeout(() => {
+          setDisplayedText(prev => prev.slice(0, -1));
+        }, 20); // Fast delete
+      } else {
+        setIsDeleting(false);
+        setTopicIndex((prev) => (prev + 1) % topics.length);
+      }
+    } else {
+      if (displayedText.length < currentTopic.length) {
+        timeout = setTimeout(() => {
+          setDisplayedText(currentTopic.slice(0, displayedText.length + 1));
+        }, 50); // Type speed
+      } else {
+        timeout = setTimeout(() => {
+          setIsDeleting(true);
+        }, 3000); // Pause before deleting
+      }
+    }
+    return () => clearTimeout(timeout);
+  }, [displayedText, isDeleting, topicIndex, topics]);
 
   return (
     <div className="min-h-full flex flex-col items-center justify-center px-4 py-12 animate-fadeUp">
-      <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2 h-[48px] flex items-center transition-all duration-500">
-        {isResearchMode ? "Deep " : ""}<span className="gradient-text">{isResearchMode ? "Research Lab" : topics[topicIndex]}</span>
+      <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2 h-[48px] flex items-center justify-center transition-all duration-500">
+        {isResearchMode ? "Deep " : ""}
+        <span className="gradient-text">
+          {isResearchMode ? "Research Lab" : displayedText}
+        </span>
+        {!isResearchMode && <span className="animate-pulse ml-1 inline-block w-1.5 h-8 sm:h-10 bg-emerald-500 rounded-full" />}
       </h1>
       <p className="text-sm sm:text-base text-textSecondary text-center max-w-md mb-8">
         {isResearchMode ? "Multi-step research with citations." : "Ask anything. Resynth streams answers live."}
