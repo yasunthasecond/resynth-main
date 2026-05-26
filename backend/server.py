@@ -444,6 +444,13 @@ async def chat_stream(
                             chunk = json.loads(data_str)
                             delta = chunk.get("choices", [{}])[0].get("delta", {})
                             content = delta.get("content")
+                            reasoning = delta.get("reasoning_content")
+                            
+                            # Stream reasoning content if present
+                            if reasoning:
+                                yield f"data: {json.dumps({'type': 'token', 'content': reasoning})}\n\n".encode()
+                            
+                            # Stream normal content if present
                             if content:
                                 yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n".encode()
                         except json.JSONDecodeError:
