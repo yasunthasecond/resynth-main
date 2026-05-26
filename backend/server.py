@@ -126,7 +126,13 @@ async def get_optional_user(authorization: Optional[str] = Header(default=None))
             issuer=issuer,
             options={"verify_aud": False}
         )
-        user_id = payload.get("sub")
+        raw_user_id = payload.get("sub")
+        
+        import hashlib
+        import uuid
+        m = hashlib.md5()
+        m.update(str(raw_user_id).encode('utf-8'))
+        user_id = str(uuid.UUID(bytes=m.digest()))
         
         plan = "free"
         try:
@@ -137,7 +143,7 @@ async def get_optional_user(authorization: Optional[str] = Header(default=None))
         except Exception:
             pass
             
-        return CurrentUser(id=str(user_id), email=None, plan=plan)
+        return CurrentUser(id=user_id, email=None, plan=plan)
     except Exception as e:
         logger.warning(f"Clerk auth verify failed: {e}")
         raise HTTPException(status_code=401, detail=f"JWT Error: {e}")
@@ -311,6 +317,19 @@ async def chat_stream(
         model_name = "qwen-max-latest" if "Resynth" in body.get("model", "") else "qwen-plus-latest"
     active_app = body.get("active_app")
     
+    user_memory_raw = body.get("user_memory")
+    user_memory_context = ""
+    if user_memory_raw:
+        try:
+            import json
+            memories = json.loads(user_memory_raw)
+            if isinstance(memories, list) and memories:
+                facts = [m.get("text", "") for m in memories if isinstance(m, dict)]
+                if facts:
+                    user_memory_context = " User Memory Context: " + "; ".join(facts) + "."
+        except Exception:
+            user_memory_context = f" User Memory Context: {user_memory_raw}"
+            
     github_context = ""
     google_drive_context = ""
     if active_app == "github" and user and sb_admin:
@@ -367,7 +386,7 @@ async def chat_stream(
     
     system_prompt = {
         "role": "system",
-        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people. NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes." + github_context + google_drive_context
+        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people (especially things happening in past years like 2024, 2025, and {current_date[-4:]}). NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes. IMPORTANT INSTRUCTION: If the user shares personal details, their name, their projects, or preferences, you MUST immediately output a memory tag exactly like this: <SAVE_MEMORY>The user's name is John</SAVE_MEMORY>. This will automatically save it to their profile." + github_context + google_drive_context + user_memory_context
     }
     
     frontend_messages = body.get("messages", [])
@@ -454,8 +473,12 @@ class ChatCreate(BaseModel):
 async def create_chat(payload: ChatCreate, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
     if not sb_admin:
         raise HTTPException(500, "Supabase not configured")
-    res = sb_admin.table("chats").insert({"user_id": user.id, "title": payload.title or "New chat"}).execute()
-    return res.data[0] if res.data else {}
+    try:
+        res = sb_admin.table("chats").insert({"user_id": user.id, "title": payload.title or "New chat"}).execute()
+        return res.data[0] if res.data else {}
+    except Exception as e:
+        logger.error(f"Failed to create chat: {e}")
+        raise HTTPException(500, f"Database Error: {e}")
 
 
 class ChatUpdate(BaseModel):
@@ -738,6 +761,32 @@ async def export_pdf(payload: PDFExportReq, user: Optional[CurrentUser] = Depend
     buf.seek(0)
     fname = (payload.title or "resynth").replace(" ", "_") + ".pdf"
     return Response(content=buf.getvalue(), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+@app.post("/api/export/md")
+async def export_md(payload: PDFExportReq, user: Optional[CurrentUser] = Depends(get_optional_user)):
+    is_paid = bool(user and user.plan in ("pro", "elite"))
+    lines = [f"# {payload.title or 'Resynth Conversation'}\n"]
+    for m in payload.messages:
+        role = "You" if m.get("role") == "user" else "Resynth"
+        lines.append(f"### {role}\n{m.get('content') or ''}\n")
+    if not is_paid:
+        lines.append("\n---\n*Exported from Resynth AI (Upgrade to remove watermark)*\n")
+    
+    fname = (payload.title or "resynth").replace(" ", "_") + ".md"
+    return Response(content="\n".join(lines), media_type="text/markdown", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+@app.post("/api/export/txt")
+async def export_txt(payload: PDFExportReq, user: Optional[CurrentUser] = Depends(get_optional_user)):
+    is_paid = bool(user and user.plan in ("pro", "elite"))
+    lines = [f"{payload.title or 'Resynth Conversation'}\n{'='*40}\n"]
+    for m in payload.messages:
+        role = "You" if m.get("role") == "user" else "Resynth"
+        lines.append(f"{role}:\n{m.get('content') or ''}\n")
+    if not is_paid:
+        lines.append("\n" + "-"*40 + "\nExported from Resynth AI (Upgrade to remove watermark)\n")
+    
+    fname = (payload.title or "resynth").replace(" ", "_") + ".txt"
+    return Response(content="\n".join(lines), media_type="text/plain", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 import hashlib
 import hmac
