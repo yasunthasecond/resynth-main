@@ -678,6 +678,7 @@ export default function App() {
               setActiveApp={setActiveApp}
               activeIntegrations={activeIntegrations}
               setView={setView}
+              loadingChatId={loadingChatId}
             />
           </ErrorBoundary>
         )}
@@ -912,7 +913,7 @@ function GuestBanner({ usage, onSignIn }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Chat panel
 // ────────────────────────────────────────────────────────────────────────────
-function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onDownloadPDF, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView }) {
+function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onDownloadPDF, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView, loadingChatId }) {
   const scrollRef = useRef(null);
   useEffect(() => {
     const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight;
@@ -923,7 +924,12 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
       <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-scroll">
-        {empty ? (
+        {loadingChatId ? (
+          <div className="min-h-full flex flex-col items-center justify-center animate-fadeUp">
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mb-4" />
+            <p className="text-textSecondary text-sm">Loading chat history...</p>
+          </div>
+        ) : empty ? (
           <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} />
         ) : (
           <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 pt-8 pb-44 flex flex-col gap-5">
