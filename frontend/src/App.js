@@ -299,11 +299,11 @@ export default function App() {
           setProfile((p) => ({ ...p, plan: d?.plan || "free" }));
         })
         .catch(() => {});
-      // folders
-      fetch(`${API}/folders`, { headers })
-        .then((r) => r.json())
-        .then((arr) => setFolders(Array.isArray(arr) ? arr : []))
-        .catch(() => {});
+      // folders (not implemented in backend yet)
+      // fetch(`${API}/folders`, { headers })
+      //   .then((r) => r.json())
+      //   .then((arr) => setFolders(Array.isArray(arr) ? arr : []))
+      //   .catch(() => {});
         
       fetchIntegrations();
 
