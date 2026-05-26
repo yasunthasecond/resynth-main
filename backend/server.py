@@ -433,9 +433,6 @@ async def chat_stream(
                         yield b"data: {\"type\":\"done\"}\n\n"
                         return
 
-                    # DEBUG TOKEN: Let's see if we get here!
-                    yield f"data: {json.dumps({'type': 'token', 'content': '*(Connected to DeepSeek...)* '})}\n\n".encode()
-
                     async for line in r.aiter_lines():
                         if not line.startswith("data:"): continue
                         data_str = line[5:].strip()
@@ -451,7 +448,7 @@ async def chat_stream(
                             
                             # Stream reasoning content if present
                             if reasoning:
-                                yield f"data: {json.dumps({'type': 'token', 'content': reasoning})}\n\n".encode()
+                                yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning})}\n\n".encode()
                             
                             # Stream normal content if present
                             if content:
