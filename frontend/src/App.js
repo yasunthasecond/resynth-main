@@ -592,10 +592,10 @@ export default function App() {
     }
   };
 
-  const downloadPDF = async () => {
+  const exportChat = async (format) => {
     if (messages.length === 0) return;
     const headers = await authHeaders();
-    const r = await fetch(`${API}/export/pdf`, {
+    const r = await fetch(`${API}/export/${format}`, {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -603,11 +603,12 @@ export default function App() {
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
       }),
     });
+    if (!r.ok) return;
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "resynth.pdf";
+    a.download = `resynth.${format}`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -647,7 +648,7 @@ export default function App() {
           onShowAuth={() => setShowAuth(true)}
           onShowPricing={() => setShowPricing(true)}
           messages={messages}
-          onDownloadPDF={downloadPDF}
+          onExportChat={exportChat}
         />
 
         {!isAuthed && <GuestBanner usage={usage} onSignIn={() => setShowAuth(true)} />}
@@ -669,7 +670,7 @@ export default function App() {
               isResearchMode={view === "research"}
               onRegenerate={regenerateLast}
               onReact={setReaction}
-              onDownloadPDF={downloadPDF}
+              onExportChat={exportChat}
               plan={profile.plan}
               limitInfo={limitInfo}
               onUpgrade={() => setShowPricing(true)}
@@ -855,7 +856,20 @@ function Sidebar({ open, onToggle, chats, folders, chatFolders, onCreateFolder, 
 // ────────────────────────────────────────────────────────────────────────────
 // Top bar
 // ────────────────────────────────────────────────────────────────────────────
-function TopBar({ plan, onToggleSidebar, sidebarOpen, isAuthed, onShowAuth, onShowPricing, messages, onDownloadPDF }) {
+function TopBar({ plan, onToggleSidebar, sidebarOpen, isAuthed, onShowAuth, onShowPricing, messages, onExportChat }) {
+  const [showExport, setShowExport] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (exportRef.current && !exportRef.current.contains(event.target)) {
+        setShowExport(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.04]">
       <div className="flex items-center gap-3">
@@ -867,14 +881,23 @@ function TopBar({ plan, onToggleSidebar, sidebarOpen, isAuthed, onShowAuth, onSh
       </div>
       <div className="flex items-center gap-2">
         {messages?.length > 0 && (
-          <button
-            data-testid="topbar-pdf-btn"
-            onClick={onDownloadPDF}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-textSecondary hover:text-white border border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02] transition-colors"
-            title="Download as PDF"
-          >
-            <Download className="w-3.5 h-3.5" /> PDF
-          </button>
+          <div className="relative" ref={exportRef}>
+            <button
+              data-testid="topbar-save-btn"
+              onClick={() => setShowExport(!showExport)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-textSecondary hover:text-white border border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02] transition-colors"
+              title="Save Conversation"
+            >
+              <Download className="w-3.5 h-3.5" /> Save
+            </button>
+            {showExport && (
+              <div className="absolute right-0 mt-2 w-36 bg-[#0f172a] border border-white/[0.08] rounded-lg shadow-xl overflow-hidden z-50 flex flex-col animate-fadeUp">
+                <button onClick={() => { setShowExport(false); onExportChat("pdf"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">PDF Document</button>
+                <button onClick={() => { setShowExport(false); onExportChat("md"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">Markdown</button>
+                <button onClick={() => { setShowExport(false); onExportChat("txt"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05]">Plain Text</button>
+              </div>
+            )}
+          </div>
         )}
         {isAuthed ? (
           plan === "free" && (
@@ -913,7 +936,7 @@ function GuestBanner({ usage, onSignIn }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Chat panel
 // ────────────────────────────────────────────────────────────────────────────
-function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onDownloadPDF, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView, loadingChatId }) {
+function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onExportChat, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView, loadingChatId }) {
   const scrollRef = useRef(null);
   useEffect(() => {
     const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight;
@@ -1043,7 +1066,7 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
 
   if (m.role === "user") {
     return (
-      <div className="self-end max-w-[85%] animate-fadeUp" data-testid="msg-user">
+      <div className="self-end max-w-[85%] animate-slideUpFade" data-testid="msg-user">
         <div className="rounded-2xl rounded-tr-md px-4 py-3 bg-white/[0.06] border border-white/[0.06] text-[14.5px] leading-relaxed whitespace-pre-wrap flex flex-col items-end">
           {m.image && (
             <div className="mb-2 rounded-lg border border-white/[0.08] overflow-hidden self-end">
@@ -1065,7 +1088,7 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
   }
 
   return (
-    <div className="flex gap-3.5 animate-fadeUp" data-testid="msg-ai">
+    <div className="flex gap-3.5 animate-slideUpFade" data-testid="msg-ai">
       <div className="shrink-0 mt-0.5">
         <BotAvatar streaming={m.streaming} />
       </div>
