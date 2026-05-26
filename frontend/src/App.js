@@ -62,7 +62,7 @@ marked.use({
   }
 });
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://resynth-main-production.up.railway.app";
 const API = `${BACKEND_URL}/api`;
 
 // ── helpers ──────────────────────────────────────────────────────────
