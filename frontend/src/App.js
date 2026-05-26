@@ -465,7 +465,6 @@ export default function App() {
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
       let accText = "";
-      let accReasoning = "";
       const updateAI = (patch) => {
         setMessages((cur) => cur.map((m, i, arr) => (i === arr.length - 1 ? { ...m, ...patch } : m)));
       };
@@ -483,11 +482,7 @@ export default function App() {
             if (!payload) continue;
             try {
               const evt = JSON.parse(payload);
-              if (evt.type === "reasoning" && evt.content) {
-                accReasoning += evt.content;
-                updateAI({ reasoning: accReasoning, status: null });
-              }
-              else if (evt.type === "token" && (evt.text || evt.content)) { 
+              if (evt.type === "token" && (evt.text || evt.content)) { 
                 accText += (evt.text || evt.content); 
                 
                 const memoryMatch = accText.match(/<SAVE_MEMORY>([\s\S]*?)<\/SAVE_MEMORY>/);
@@ -1103,21 +1098,8 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
           </div>
         )}
         
-        {/* Reasoning / Thinking */}
-        {m.reasoning && (
-          <details className="mb-3 group">
-            <summary className="cursor-pointer text-[13px] text-white/50 font-medium select-none list-none inline-flex items-center gap-1.5 hover:text-white/80 transition-colors">
-              <span className="inline-block transition-transform duration-200 group-open:rotate-90">▶</span>
-              Thinking
-            </summary>
-            <div className="mt-2 text-[13.5px] text-white/50 pl-4 border-l-2 border-white/10 italic md whitespace-pre-wrap">
-              {m.reasoning}
-            </div>
-          </details>
-        )}
-
         <div className="md text-[14.5px]">
-          {(!m.content && m.streaming && !m.reasoning) ? (
+          {(!m.content && m.streaming) ? (
             <div className="inline-flex items-center gap-2 text-[12.5px] text-white/70 font-medium">
               <span className="w-3.5 h-3.5 border-[2px] border-white/20 border-t-white/70 rounded-full animate-spin" />
               {m.status || "Connecting..."}

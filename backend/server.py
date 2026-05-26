@@ -386,7 +386,7 @@ async def chat_stream(
     
     system_prompt = {
         "role": "system",
-        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. You must never identify yourself as Qwen, ChatGPT, Claude, or any other model. You must never mention Alibaba, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people (especially things happening in past years like 2024, 2025, and {current_date[-4:]}). NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes. IMPORTANT INSTRUCTION: If the user shares personal details, their name, their projects, or preferences, you MUST immediately output a memory tag exactly like this: <SAVE_MEMORY>The user's name is John</SAVE_MEMORY>. This will automatically save it to their profile." + github_context + google_drive_context + user_memory_context
+        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. IDENTITY RULES (strictly follow these): If anyone asks who you are, what you are, or who made/created/built you, you must ALWAYS say: 'I am Resynth, an AI assistant created by Resynth engineers.' Never say anything else. You must never identify yourself as DeepSeek, Qwen, ChatGPT, Claude, or any other AI model. You must never mention Alibaba, DeepSeek, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth, created by Resynth engineers. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people (especially things happening in past years like 2024, 2025, and {current_date[-4:]}). NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes. IMPORTANT INSTRUCTION: If the user shares personal details, their name, their projects, or preferences, you MUST immediately output a memory tag exactly like this: <SAVE_MEMORY>The user's name is John</SAVE_MEMORY>. This will automatically save it to their profile." + github_context + google_drive_context + user_memory_context
     }
     
     frontend_messages = body.get("messages", [])
@@ -413,7 +413,8 @@ async def chat_stream(
         "messages": messages,
         "stream": True,
         "enable_search": True,
-        "temperature": 0.1
+        "temperature": 0.1,
+        "max_tokens": 4096
     }
     
     upstream_api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
@@ -446,11 +447,8 @@ async def chat_stream(
                             content = delta.get("content")
                             reasoning = delta.get("reasoning_content")
                             
-                            # Stream reasoning content if present
-                            if reasoning:
-                                yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning})}\n\n".encode()
-                            
-                            # Stream normal content if present
+                            # Skip reasoning/thinking content (internal only, not shown to user)
+                            # Stream normal content only
                             if content:
                                 yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n".encode()
                         except json.JSONDecodeError:
