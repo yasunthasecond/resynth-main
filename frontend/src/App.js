@@ -216,7 +216,6 @@ export default function App() {
   const [streaming, setStreaming] = useState(false);
   const [usage, setUsage] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [billingStatus, setBillingStatus] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null); // {plan, used, limit, unlock_at} when over
@@ -635,7 +634,7 @@ export default function App() {
         isAuthed={isAuthed}
         profile={profile}
         onShowAuth={() => setShowAuth(true)}
-        onShowPricing={() => setShowPricing(true)}
+        onShowPricing={() => setView("pricing")}
         usage={usage}
       />
 
@@ -646,14 +645,16 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           isAuthed={isAuthed}
           onShowAuth={() => setShowAuth(true)}
-          onShowPricing={() => setShowPricing(true)}
+          onShowPricing={() => setView("pricing")}
           messages={messages}
           onExportChat={exportChat}
         />
 
         {!isAuthed && <GuestBanner usage={usage} onSignIn={() => setShowAuth(true)} />}
 
-        {view === "images" ? (
+        {view === "pricing" ? (
+          <ErrorBoundary><PricingView isAuthed={isAuthed} authHeaders={authHeaders} billing={billingStatus} onRequireAuth={() => setShowAuth(true)} /></ErrorBoundary>
+        ) : view === "images" ? (
           <ErrorBoundary><ImagesView authHeaders={authHeaders} /></ErrorBoundary>
         ) : view === "integrations" ? (
           <ErrorBoundary><IntegrationsView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} /></ErrorBoundary>
@@ -673,7 +674,7 @@ export default function App() {
               onExportChat={exportChat}
               plan={profile.plan}
               limitInfo={limitInfo}
-              onUpgrade={() => setShowPricing(true)}
+              onUpgrade={() => setView("pricing")}
               onStop={stopGeneration}
               activeApp={activeApp}
               setActiveApp={setActiveApp}
@@ -686,15 +687,6 @@ export default function App() {
       </main>
 
       {showAuth && <AuthPage onClose={() => setShowAuth(false)} />}
-      {showPricing && (
-        <PricingModal
-          onClose={() => setShowPricing(false)}
-          isAuthed={isAuthed}
-          authHeaders={authHeaders}
-          billing={billingStatus}
-          onRequireAuth={() => { setShowPricing(false); setShowAuth(true); }}
-        />
-      )}
     </div>
   );
 }
@@ -1604,9 +1596,9 @@ function TestimonialBanner() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Pricing modal
+// Pricing View (full page)
 // ────────────────────────────────────────────────────────────────────────────
-function PricingModal({ onClose, isAuthed, authHeaders, billing, onRequireAuth }) {
+function PricingView({ isAuthed, authHeaders, billing, onRequireAuth }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
 
@@ -1619,9 +1611,7 @@ function PricingModal({ onClose, isAuthed, authHeaders, billing, onRequireAuth }
       const d = await r.json();
       if (!r.ok) throw new Error(d.detail || "Checkout failed");
       if (d.url) window.location.href = d.url;
-    } catch (e) {
-      setError(e.message);
-    } finally { setBusy(null); }
+    } catch (e) { setError(e.message); } finally { setBusy(null); }
   };
 
   const openPortal = async () => {
@@ -1634,77 +1624,77 @@ function PricingModal({ onClose, isAuthed, authHeaders, billing, onRequireAuth }
   const currentPlan = billing?.plan || "free";
 
   const plans = [
-    { id: "free", name: "Free", price: "$0", per: "forever", limit: "20 messages / day", features: ["Streaming chat", "Image generation", "Chat history"] },
-    { id: "pro", name: "Pro", price: "$12", per: "month", limit: "500 messages / day", features: ["Everything in Free", "PDF without watermark", "Deep dive & lit review", "Priority models"] },
-    { id: "elite", name: "Elite", price: "$49", per: "month", limit: "1500 messages / day", features: ["Everything in Pro", "Highest daily limits", "Earliest access to new models", "Priority support"] },
+    { id: "free", name: "Free", price: "$0", per: "forever", limit: "20 messages / day",
+      features: ["Streaming chat", "Chat history", "Basic web search", "Guest access"] },
+    { id: "pro", name: "Pro", price: "$12", per: "month", limit: "500 messages / day",
+      features: ["App integrations (GitHub, Drive)", "Deep dive & lit review", "Smarter model access", "Exports without watermark", "Everything in Free"] },
+    { id: "elite", name: "Elite", price: "$49", per: "month", limit: "1500 messages / day",
+      features: ["Highest daily limits", "Priority access during peak hours", "Earliest access to new models", "Dedicated support", "Everything in Pro"] },
   ];
 
   return (
-    <div data-testid="pricing-modal" className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 overflow-y-auto" onClick={onClose}>
-      <div className="w-full max-w-4xl rounded-2xl border border-white/[0.08] bg-[#10131A] p-7 shadow-2xl my-8" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-display text-2xl font-bold">Choose your plan</h2>
-            <p className="text-textSecondary text-[13px] mt-1">Cancel anytime via the customer portal.</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 grid place-items-center rounded-md text-textSecondary hover:text-white"><X className="w-4 h-4" /></button>
-        </div>
+    <div className="flex-1 flex flex-col h-full bg-bg overflow-y-auto animate-fadeUp">
+      <div className="w-full max-w-5xl mx-auto px-6 py-12 flex flex-col">
+        <h1 className="font-display text-3xl font-bold mb-2 text-white">Upgrade your experience</h1>
+        <p className="text-textSecondary text-[15px] mb-10">Pick the plan that suits you. Cancel anytime.</p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {plans.map((p) => {
             const isCurrent = currentPlan === p.id;
-            const isUpgrade = p.id !== "free";
+            const isPaid = p.id !== "free";
             return (
-              <div key={p.id} className={`rounded-2xl border p-5 flex flex-col ${p.id === "pro" ? "border-emerald-500/30 bg-emerald-500/[0.03]" : "border-white/[0.08] bg-white/[0.02]"}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="font-display text-lg font-bold flex items-center gap-2">
-                    {p.id === "pro" && <Crown className="w-4 h-4 text-emerald-400" />}
-                    {p.id === "elite" && <Sparkles className="w-4 h-4 text-amber-300" />}
-                    {p.name}
-                  </div>
-                  {p.id === "pro" && <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-semibold">Popular</span>}
+              <div key={p.id} className={`rounded-2xl border p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 ${
+                p.id === "pro" ? "border-emerald-500/50 bg-emerald-500/[0.04] shadow-[0_0_40px_rgba(16,185,129,0.08)]" :
+                p.id === "elite" ? "border-amber-400/30 bg-amber-400/[0.03]" :
+                "border-white/[0.08] bg-white/[0.02]"}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-bold text-white">{p.name}</h3>
+                  {p.id === "pro" && <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Most Popular</span>}
+                  {p.id === "elite" && <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">Power User</span>}
                 </div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-bold">{p.price}</span>
-                  <span className="text-textSecondary text-[12px]">/ {p.per}</span>
+                <div className="flex items-baseline gap-1 mb-3">
+                  <span className="text-4xl font-display font-bold text-white">{p.price}</span>
+                  <span className="text-sm text-textSecondary">/{p.per}</span>
                 </div>
-                <div className="text-[12px] text-textSecondary mb-4">{p.limit}</div>
-                <ul className="space-y-1.5 mb-5 flex-1">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13px] text-textSecondary">
-                      <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" /> <span>{f}</span>
+                <div className={`text-[12px] font-semibold mb-6 py-1.5 px-3 rounded-lg inline-block w-fit ${
+                  p.id === "pro" ? "text-emerald-400 bg-emerald-400/10" :
+                  p.id === "elite" ? "text-amber-400 bg-amber-400/10" :
+                  "text-textSecondary bg-white/[0.04]"}`}>
+                  {p.limit}
+                </div>
+                <ul className="flex flex-col gap-3 flex-1 mb-8">
+                  {p.features.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[13.5px] text-textSecondary">
+                      <Check className={`w-4 h-4 shrink-0 mt-0.5 ${p.id === "elite" ? "text-amber-400" : "text-emerald-500"}`} />
+                      <span className="leading-snug">{f}</span>
                     </li>
                   ))}
                 </ul>
-                {isCurrent ? (
-                  <div className="space-y-1.5">
-                    <div className="w-full text-center py-2.5 rounded-lg text-[13px] font-semibold bg-white/[0.04] border border-white/[0.07] text-white">Current plan</div>
-                    {isUpgrade && (
-                      <button data-testid={`manage-${p.id}`} onClick={openPortal} className="btn-transparent w-full py-2.5 rounded-lg text-[13px] font-medium">
-                        <ExternalLink className="w-3.5 h-3.5" /> Manage subscription
-                      </button>
-                    )}
-                  </div>
-                ) : isUpgrade ? (
-                  <button
-                    data-testid={`subscribe-${p.id}`}
-                    onClick={() => subscribe(p.id)}
-                    disabled={busy === p.id}
-                    className={`w-full py-2.5 rounded-lg text-[13px] font-semibold transition-colors ${p.id === "pro" ? "bg-emerald-500 text-[#0A0C10] hover:bg-emerald-400" : "bg-white text-[#0A0C10] hover:bg-white/90"}`}
-                  >
-                    {busy === p.id ? "…" : `Subscribe to ${p.name}`}
+                <button
+                  onClick={() => isCurrent ? openPortal() : subscribe(p.id)}
+                  disabled={busy === p.id || (!isPaid && isCurrent)}
+                  className={`w-full py-3 rounded-xl text-[14px] font-bold transition-all flex items-center justify-center gap-2 ${
+                    isCurrent ? "border border-white/[0.12] text-textSecondary cursor-default" :
+                    p.id === "pro" ? "bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.25)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]" :
+                    p.id === "elite" ? "bg-amber-400 text-black hover:bg-amber-300 shadow-[0_0_20px_rgba(251,191,36,0.2)]" :
+                    "border border-white/[0.1] text-white hover:bg-white/[0.06]"}`}
+                >
+                  {busy === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {isCurrent ? "Current Plan" : isPaid ? "Upgrade" : "Get Started"}
+                </button>
+                {isCurrent && isPaid && (
+                  <button onClick={openPortal} className="mt-2 w-full py-2 rounded-lg text-[12px] text-textSecondary hover:text-white border border-white/[0.06] hover:border-white/[0.12] transition-colors flex items-center justify-center gap-1">
+                    <ExternalLink className="w-3 h-3" /> Manage billing
                   </button>
-                ) : (
-                  <div className="w-full text-center py-2.5 rounded-lg text-[13px] text-textSecondary border border-white/[0.06]">Default</div>
                 )}
               </div>
             );
           })}
         </div>
-        {error && <div className="text-[12px] text-rose-300 mt-2">{error}</div>}
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
         {billing?.subscription_status === "cancelled" && (
-          <div className="text-[12.5px] text-amber-300 bg-amber-500/[0.05] border border-amber-500/15 rounded-lg p-3 mt-3">
-            Your {billing.plan} subscription is cancelled. You'll keep access until {billing.current_period_end ? new Date(billing.current_period_end).toLocaleDateString() : "the end of period"}.
+          <div className="text-[13px] text-amber-300 bg-amber-500/[0.06] border border-amber-500/15 rounded-xl p-4 text-center">
+            Your {billing.plan} plan is cancelled. You keep access until {billing.current_period_end ? new Date(billing.current_period_end).toLocaleDateString() : "period end"}.
           </div>
         )}
       </div>
