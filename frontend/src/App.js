@@ -955,35 +955,41 @@ function Hero({ onPick, isResearchMode }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const { user } = useUser();
   
-  // Memoize topics so the effect doesn't trigger on every render if topics array is recreated inline
   const topics = useMemo(() => [
     "What are we exploring?",
     "What are we getting into?",
     ...(user ? [`Hey, ${user.firstName || user.fullName || 'there'}!`] : [])
   ], [user]);
 
+  const subTopics = useMemo(() => [
+    "Search the web, analyze documents, and generate insights in real-time.",
+    "Experience the next evolution of intelligent search and reasoning.",
+    "Ask anything. I'll search, reason, and stream the facts instantly.",
+    "Your advanced AI research partner."
+  ], []);
+
   useEffect(() => {
     let timeout;
-    const currentTopic = topics[topicIndex];
+    const currentTopic = topics[topicIndex % topics.length];
     
     if (isDeleting) {
       if (displayedText.length > 0) {
         timeout = setTimeout(() => {
           setDisplayedText(prev => prev.slice(0, -1));
-        }, 20); // Fast delete
+        }, 20);
       } else {
         setIsDeleting(false);
-        setTopicIndex((prev) => (prev + 1) % topics.length);
+        setTopicIndex((prev) => prev + 1);
       }
     } else {
       if (displayedText.length < currentTopic.length) {
         timeout = setTimeout(() => {
           setDisplayedText(currentTopic.slice(0, displayedText.length + 1));
-        }, 50); // Type speed
+        }, 50);
       } else {
         timeout = setTimeout(() => {
           setIsDeleting(true);
-        }, 3000); // Pause before deleting
+        }, 3000);
       }
     }
     return () => clearTimeout(timeout);
@@ -998,8 +1004,8 @@ function Hero({ onPick, isResearchMode }) {
         </span>
         {!isResearchMode && <span className="animate-pulse ml-1 inline-block w-1.5 h-8 sm:h-10 bg-emerald-500 rounded-full" />}
       </h1>
-      <p className="text-sm sm:text-base text-textSecondary text-center max-w-md mb-8">
-        {isResearchMode ? "Multi-step research with citations." : "Ask anything. Resynth streams answers live."}
+      <p className={`text-sm sm:text-base text-textSecondary text-center max-w-md mb-8 transition-opacity duration-500 ${isDeleting ? "opacity-0" : "opacity-100"}`}>
+        {isResearchMode ? "Multi-step research with citations." : subTopics[topicIndex % subTopics.length]}
       </p>
     </div>
   );
