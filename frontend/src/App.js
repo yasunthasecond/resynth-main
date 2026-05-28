@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback, startTransition } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Search,
@@ -1097,120 +1098,124 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
 
   const copy = () => { navigator.clipboard.writeText(m.content || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); };
 
-  if (m.role === "user") {
-    return (
-      <div className="self-end max-w-[85%] animate-slideUpFade" data-testid="msg-user">
-        <div className="rounded-2xl rounded-tr-md px-4 py-3 bg-white/[0.06] border border-white/[0.06] text-[14.5px] leading-relaxed whitespace-pre-wrap flex flex-col items-end">
-          {m.image && (
-            <div className="mb-2 rounded-lg border border-white/[0.08] overflow-hidden self-end">
-              <img src={m.image} alt="Upload" className="max-w-[200px] max-h-[200px] object-cover" />
-            </div>
-          )}
-          {m.pdf && (
-            <div className="mb-2 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
-              <FileText className="w-5 h-5 text-emerald-400" />
-              <span className="text-[13px] text-textPrimary font-medium truncate max-w-[200px]">{m.pdf}</span>
-            </div>
-          )}
-          {!(m.content === "[image]" || m.content === "[pdf]") && (
-            <div className="text-right">{m.content}</div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex animate-slideUpFade" data-testid="msg-ai">
-      <div className="flex-1 min-w-0" ref={bubbleRef}>
-        {/* Topic image */}
-        {m.imageUrl && !m.streaming && (
-          <div className="mb-3 rounded-xl overflow-hidden border border-white/[0.06]">
-            <img
-              src={m.imageUrl}
-              alt="Topic visual"
-              className="w-full h-44 object-cover"
-              loading="lazy"
-              onError={(e) => { e.target.parentElement.style.display = 'none'; }}
-            />
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      data-testid={m.role === "user" ? "msg-user" : "msg-ai"}
+    >
+      {m.role === "user" ? (
+        <div className="self-end max-w-[85%]">
+          <div className="rounded-2xl rounded-tr-md px-4 py-3 bg-white/[0.06] border border-white/[0.06] text-[14.5px] leading-relaxed whitespace-pre-wrap flex flex-col items-end">
+            {m.image && (
+              <div className="mb-2 rounded-lg border border-white/[0.08] overflow-hidden self-end">
+                <img src={m.image} alt="Upload" className="max-w-[200px] max-h-[200px] object-cover" />
+              </div>
+            )}
+            {m.pdf && (
+              <div className="mb-2 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <span className="text-[13px] text-textPrimary font-medium truncate max-w-[200px]">{m.pdf}</span>
+              </div>
+            )}
+            {!(m.content === "[image]" || m.content === "[pdf]") && (
+              <div className="text-right">{m.content}</div>
+            )}
           </div>
-        )}
-        
-        <div className="md text-[14.5px]">
-          {(!m.content && m.streaming) ? (
-            <div className="inline-flex items-center gap-2 text-[12.5px] text-white/70 font-medium">
-              <span className="w-3.5 h-3.5 border-[2px] border-white/20 border-t-white/70 rounded-full animate-spin" />
-              {m.status || "Connecting..."}
-            </div>
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: renderMarkdownMath(m.content || "_(no response)_") }} />
-          )}
         </div>
-        {!m.streaming && m.content && (
-          <>
-            {/* Sources panel */}
-            {m.sources?.count > 0 && (
-              <div className="mt-3">
-                <button
-                  onClick={() => setSourcesOpen(o => !o)}
-                  className="flex items-center gap-1.5 text-[12px] text-textSecondary hover:text-emerald-400 transition-colors"
-                >
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {m.sources.count} source{m.sources.count !== 1 ? 's' : ''} gathered
-                  <span className="text-[10px] opacity-60">{sourcesOpen ? '▲' : '▼'}</span>
-                </button>
-                {sourcesOpen && (
-                  <div className="mt-2 flex flex-col gap-1.5 pl-3 border-l border-white/[0.08]">
-                    {m.sources.links?.map((s, i) => (
-                      <a
+      ) : (
+        <div className="flex" ref={bubbleRef}>
+          <div className="flex-1 min-w-0">
+            {m.imageUrl && !m.streaming && (
+              <div className="mb-3 rounded-xl overflow-hidden border border-white/[0.06]">
+                <img
+                  src={m.imageUrl}
+                  alt="Topic visual"
+                  className="w-full h-44 object-cover"
+                  loading="lazy"
+                  onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                />
+              </div>
+            )}
+            
+            <div className="md text-[14.5px]">
+              {streaming && !m.content ? (
+                <div className="flex items-center gap-3 text-[13px] text-textSecondary font-mono mt-1">
+                  <div className="flex gap-1.5 items-center">
+                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0 }} />
+                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2 }} />
+                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} />
+                  </div>
+                  <span className="animate-pulse">{m.status || "Thinking..."}</span>
+                </div>
+              ) : (
+                <div dangerouslySetInnerHTML={{ __html: renderMarkdownMath(m.content || "_(no response)_") }} />
+              )}
+            </div>
+            {!m.streaming && m.content && (
+              <>
+                {m.sources?.count > 0 && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setSourcesOpen(o => !o)}
+                      className="flex items-center gap-1.5 text-[12px] text-textSecondary hover:text-emerald-400 transition-colors"
+                    >
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {m.sources.count} source{m.sources.count !== 1 ? 's' : ''} gathered
+                      <span className="text-[10px] opacity-60">{sourcesOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {sourcesOpen && (
+                      <div className="mt-2 flex flex-col gap-1.5 pl-3 border-l border-white/[0.08]">
+                        {m.sources.links?.map((s, i) => (
+                          <a
+                            key={i}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] text-emerald-400 hover:text-emerald-300 truncate max-w-full block"
+                            title={s.title}
+                          >
+                            {s.title || s.url}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="mt-2 flex items-center gap-1 flex-wrap">
+                  <ActionBtn testid="copy-btn" onClick={copy} active={copied} Icon={copied ? Check : Copy} label={copied ? "Copied" : "Copy"} />
+                  <ActionBtn testid="like-btn" onClick={() => onReact(m.id, "like")} active={m.reaction === "like"} Icon={ThumbsUp} label="Good" />
+                  <ActionBtn testid="dislike-btn" onClick={() => onReact(m.id, "dislike")} active={m.reaction === "dislike"} Icon={ThumbsDown} label="Bad" />
+                  {isLast && !streaming && (
+                    <ActionBtn testid="regen-btn" onClick={onRegenerate} active={false} Icon={RotateCcw} label="Regenerate" />
+                  )}
+                  {m.workedSecs && (
+                    <span className="ml-2 text-[11.5px] text-textSecondary/60 font-mono">
+                      Worked for {m.workedSecs}s
+                    </span>
+                  )}
+                </div>
+                {m.followUps?.length > 0 && (
+                  <div className="mt-4 flex flex-col gap-2 pl-2">
+                    {m.followUps.map((q, i) => (
+                      <button
                         key={i}
-                        href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[12px] text-emerald-400 hover:text-emerald-300 truncate max-w-full block"
-                        title={s.title}
+                        onClick={() => onSend && onSend(q)}
+                        className="flex items-start text-left gap-2 text-[13.5px] text-white/70 hover:text-white transition-colors group"
                       >
-                        {s.title || s.url}
-                      </a>
+                        <span className="opacity-50 mt-[3px] text-[10px] group-hover:text-emerald-400 group-hover:opacity-100 transition-all">▶</span>
+                        <span>{q}</span>
+                      </button>
                     ))}
                   </div>
                 )}
-              </div>
+              </>
             )}
-            {/* Action buttons */}
-            <div className="mt-2 flex items-center gap-1 flex-wrap">
-              <ActionBtn testid="copy-btn" onClick={copy} active={copied} Icon={copied ? Check : Copy} label={copied ? "Copied" : "Copy"} />
-              <ActionBtn testid="like-btn" onClick={() => onReact(m.id, "like")} active={m.reaction === "like"} Icon={ThumbsUp} label="Good" />
-              <ActionBtn testid="dislike-btn" onClick={() => onReact(m.id, "dislike")} active={m.reaction === "dislike"} Icon={ThumbsDown} label="Bad" />
-              {isLast && !streaming && (
-                <ActionBtn testid="regen-btn" onClick={onRegenerate} active={false} Icon={RotateCcw} label="Regenerate" />
-              )}
-              {m.workedSecs && (
-                <span className="ml-2 text-[11.5px] text-textSecondary/60 font-mono">
-                  Worked for {m.workedSecs}s
-                </span>
-              )}
-            </div>
-
-            {/* Follow-up question chips */}
-            {m.followUps?.length > 0 && (
-              <div className="mt-4 flex flex-col gap-2 pl-2">
-                {m.followUps.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => onSend && onSend(q)}
-                    className="flex items-start text-left gap-2 text-[13.5px] text-white/70 hover:text-white transition-colors group"
-                  >
-                    <span className="opacity-50 mt-[3px] text-[10px] group-hover:text-emerald-400 group-hover:opacity-100 transition-all">▶</span>
-                    <span>{q}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
