@@ -7,3 +7,4 @@ reportlab==4.2.5
 python-multipart==0.0.12
 duckduckgo-search==6.3.7
 cryptography==43.0.1
+pypdf==5.1.0
