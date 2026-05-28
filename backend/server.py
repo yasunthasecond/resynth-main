@@ -261,14 +261,39 @@ async def models():
 @app.post("/api/generate-title")
 async def generate_title(request: Request):
     body = await request.json()
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            r = await client.post(f"{UPSTREAM}/api/generate-title", json=body)
-            if r.status_code == 200:
-                return r.json()
-        except Exception:
-            pass
     text = (body.get("message") or "").strip()
+    if not text:
+        return {"title": "New chat"}
+        
+    upstream_api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("DASHSCOPE_API_KEY")
+    headers = {
+        "Authorization": f"Bearer {upstream_api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "qwen-plus-latest",
+        "messages": [
+            {"role": "system", "content": "You are a title generator. Generate a very short, concise 3-5 word title for a conversation that starts with the following message. ONLY output the title text, nothing else. Do not use quotes or punctuation."},
+            {"role": "user", "content": text[:500]}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 15
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(f"{UPSTREAM}/chat/completions", json=payload, headers=headers)
+            if r.status_code == 200:
+                data = r.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    generated_title = data["choices"][0]["message"].get("content", "").strip(' \t\n\r"\'')
+                    if generated_title:
+                        return {"title": generated_title}
+    except Exception as e:
+        logger.warning(f"Title generation failed: {e}")
+        pass
+
     return {"title": (text[:48] or "New chat").rstrip(" ,.;:-—")}
 
 
