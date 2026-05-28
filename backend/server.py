@@ -370,9 +370,9 @@ async def chat_stream(
             if isinstance(memories, list) and memories:
                 facts = [m.get("text", "") for m in memories if isinstance(m, dict)]
                 if facts:
-                    user_memory_context = " User Memory Context: " + "; ".join(facts) + "."
+                    user_memory_context = f"\\n\\n[USER MEMORY CONTEXT: {'; '.join(facts)}]\\nCRITICAL INSTRUCTION: If the user shares information that is semantically identical or very similar to an existing memory above, DO NOT output a <SAVE_MEMORY> tag. Only save truly novel facts."
         except Exception:
-            user_memory_context = f" User Memory Context: {user_memory_raw}"
+            user_memory_context = f"\\n\\n[USER MEMORY CONTEXT: {user_memory_raw}]\\nCRITICAL INSTRUCTION: If the user shares information that is semantically identical or very similar to an existing memory above, DO NOT output a <SAVE_MEMORY> tag. Only save truly novel facts."
             
     github_context = ""
     google_drive_context = ""
