@@ -341,7 +341,6 @@ async def chat_stream(
     user_memory_context = ""
     if user_memory_raw:
         try:
-            import json
             memories = json.loads(user_memory_raw)
             if isinstance(memories, list) and memories:
                 facts = [m.get("text", "") for m in memories if isinstance(m, dict)]
