@@ -1999,11 +1999,11 @@ function NotebookView({ isAuthed, authHeaders, onRequireAuth, API }) {
           try {
             const evt = JSON.parse(line.slice(5).trim());
             if (evt.type === "done") break;
-            if (evt.type === "text" && evt.content) {
-              acc = evt.content;
+            if (evt.type === "text" && (evt.text || evt.content)) {
+              acc = (evt.text || evt.content);
               setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, content: acc, status: null } : x));
-            } else if (evt.type === "token" && evt.content) {
-              acc += evt.content;
+            } else if (evt.type === "token" && (evt.text || evt.content)) {
+              acc += (evt.text || evt.content);
               setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, content: acc, status: null } : x));
             } else if (evt.type === "status") {
               setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, status: evt.message } : x));
