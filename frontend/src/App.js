@@ -699,7 +699,7 @@ export default function App() {
         ) : view === "memory" ? (
           <ErrorBoundary><MemoryView isAuthed={isAuthed} authHeaders={authHeaders} /></ErrorBoundary>
         ) : view === "notebooks" ? (
-          <ErrorBoundary><NotebookView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} API={API} sendMessage={sendMessage} streaming={streaming} onStop={stopGeneration} /></ErrorBoundary>
+          <ErrorBoundary><NotebookView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} API={API} sendMessage={sendMessage} streaming={streaming} onStop={stopGeneration} showPrompt={showPrompt} showAlert={showAlert} /></ErrorBoundary>
         ) : view === "search" ? (
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
         ) : (
@@ -1919,7 +1919,7 @@ function MemoryView() {
 // ────────────────────────────────────────────────────────────────────────────
 // NotebookView — NotebookLM-style research notebooks
 // ────────────────────────────────────────────────────────────────────────────
-function NotebookView({ isAuthed, authHeaders, onRequireAuth, API }) {
+function NotebookView({ isAuthed, authHeaders, onRequireAuth, API, showPrompt, showAlert }) {
   const [notebooks, setNotebooks] = useState([]);
   const [activeNotebook, setActiveNotebook] = useState(null);
   const [sources, setSources] = useState([]);
