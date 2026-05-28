@@ -247,9 +247,17 @@ export default function App() {
   const [folders, setFolders] = useState([]);
   const [chatFolders, setChatFolders] = useState({});
 
+  const [modal, setModal] = useState(null);
+  const showAlert = (message) => new Promise(res => setModal({ type: 'alert', message, onConfirm: () => { setModal(null); res(); } }));
+  const showPrompt = (message, defaultValue = "") => new Promise(res => setModal({ type: 'prompt', message, defaultValue, onConfirm: (val) => { setModal(null); res(val); }, onCancel: () => { setModal(null); res(null); } }));
+
+  const [modal, setModal] = useState(null);
+  const showAlert = (message) => new Promise(res => setModal({ type: 'alert', message, onConfirm: () => { setModal(null); res(); } }));
+  const showPrompt = (message, defaultValue = "") => new Promise(res => setModal({ type: 'prompt', message, defaultValue, onConfirm: (val) => { setModal(null); res(val); }, onCancel: () => { setModal(null); res(null); } }));
+
   const createFolder = async () => {
-    if (!isAuthed) return alert("Must be signed in!");
-    const name = window.prompt("Folder name:");
+    if (!isAuthed) { showAlert("Must be signed in!"); return; }
+    const name = await showPrompt("Folder name:");
     if (!name) return;
     const headers = await authHeaders();
     const res = await fetch(`${API}/folders`, {
@@ -262,9 +270,9 @@ export default function App() {
   };
 
   const moveChat = async (chatId) => {
-    if (folders.length === 0) return alert("Create a folder first!");
+    if (folders.length === 0) { showAlert("Create a folder first!"); return; }
     const opts = folders.map((f, i) => `${i + 1}. ${f.name}`).join("\n");
-    const num = window.prompt(`Move to folder (enter number) or 0 to remove:\n0. Uncategorized\n${opts}`);
+    const num = await showPrompt(`Move to folder (enter number) or 0 to remove:\n0. Uncategorized\n${opts}`);
     if (num === null) return;
     
     let folder_id = null;
@@ -1278,7 +1286,7 @@ function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setAct
         setImagePreview(String(result));
         setPdfData(null); setPdfName(null);
       } else {
-        alert("Only images and PDFs are supported");
+        showAlert("Only images and PDFs are supported");
       }
     };
     reader.readAsDataURL(f);
@@ -1719,7 +1727,7 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
 
   const handleConnect = async (slug) => {
     if (!isAuthed) return onRequireAuth();
-    if (slug !== "github" && slug !== "google-drive") return alert("This integration is not supported yet.");
+    if (slug !== "github" && slug !== "google-drive") { showAlert("This integration is not supported yet."); return; }
     
     setConnecting(slug);
     try {
@@ -1730,11 +1738,11 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(`Error: ${data.detail || "Failed to connect"}`);
+        showAlert(`Error: ${data.detail || "Failed to connect"}`);
       }
     } catch (e) {
       console.error("Connect failed", e);
-      alert("Network error. Is the backend running?");
+      showAlert("Network error. Is the backend running?");
     } finally {
       setConnecting(null);
     }
@@ -1925,7 +1933,7 @@ function NotebookView({ isAuthed, authHeaders, onRequireAuth, API }) {
 
   const createNotebook = async () => {
     if (!isAuthed) { onRequireAuth(); return; }
-    const title = prompt("Notebook name:", "Untitled Notebook");
+    const title = await showPrompt("Notebook name:", "Untitled Notebook");
     if (!title) return;
     const h = await authHeaders();
     const res = await fetch(`${API}/notebooks`, { method: "POST", headers: { "Content-Type": "application/json", ...h }, body: JSON.stringify({ title }) });
