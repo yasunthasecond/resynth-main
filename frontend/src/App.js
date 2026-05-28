@@ -420,7 +420,8 @@ export default function App() {
           if (d.id) {
             // Swap temp id for real DB id
             setActiveId(d.id);
-            setChats((cs) => cs.map((c) => c.id === chat_id ? { ...c, id: d.id } : c));
+            const temp_id = chat_id;
+            setChats((cs) => cs.map((c) => c.id === temp_id ? { ...c, id: d.id } : c));
             chat_id = d.id;
             // Save user message now that we have a real chat_id
             if (!regenerateOf) {
