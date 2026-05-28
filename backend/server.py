@@ -5,7 +5,8 @@ import json
 import hmac
 import hashlib
 import base64
-import fitz  # PyMuPDF
+import pypdf
+import io
 import logging
 import urllib.parse
 from datetime import datetime, timezone
@@ -635,15 +636,14 @@ class SourceUpload(BaseModel):
 async def upload_source(notebook_id: str, payload: SourceUpload, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
     if not sb_admin: raise HTTPException(500, "Supabase not configured")
     
-    # Extract text using PyMuPDF (fitz)
+    # Extract text using pypdf
     extracted_text = ""
     try:
         file_bytes = base64.b64decode(payload.base64_data)
         if payload.filename.lower().endswith(".pdf"):
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            for page in doc:
-                extracted_text += page.get_text("text") + "\n"
-            doc.close()
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            for page in reader.pages:
+                extracted_text += (page.extract_text() or "") + "\n"
         else:
             extracted_text = file_bytes.decode("utf-8")
     except Exception as e:
