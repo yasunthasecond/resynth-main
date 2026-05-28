@@ -1080,10 +1080,7 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
   }
 
   return (
-    <div className="flex gap-3.5 animate-slideUpFade" data-testid="msg-ai">
-      <div className="shrink-0 mt-0.5">
-        <BotAvatar streaming={m.streaming} />
-      </div>
+    <div className="flex animate-slideUpFade" data-testid="msg-ai">
       <div className="flex-1 min-w-0" ref={bubbleRef}>
         {/* Topic image */}
         {m.imageUrl && !m.streaming && (
