@@ -197,6 +197,25 @@ class ErrorBoundary extends React.Component {
 export default function App() {
   const { isSignedIn, user } = useUser();
   const { getToken } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      let cloud = user.unsafeMetadata?.re_memory || [];
+      let local = [];
+      try {
+        const raw = localStorage.getItem("re_memory");
+        local = raw && !raw.startsWith("[") ? [{id: Date.now().toString(), text: raw}] : (raw ? JSON.parse(raw) : []);
+      } catch {}
+      const merged = [...cloud];
+      for (const lm of local) {
+        if (!merged.some(cm => cm.text === lm.text)) merged.push(lm);
+      }
+      if (merged.length > cloud.length) {
+        user.update({ unsafeMetadata: { ...user.unsafeMetadata, re_memory: merged } }).catch(console.error);
+      }
+      localStorage.setItem("re_memory", JSON.stringify(merged));
+    }
+  }, [user]);
   const isAuthed = isSignedIn;
 
   const authHeaders = useCallback(async () => {
@@ -509,8 +528,11 @@ export default function App() {
                             let arr = [];
                             if (raw && !raw.startsWith("[")) { arr = [{id: Date.now().toString(), text: raw}]; }
                             else { arr = raw ? JSON.parse(raw) : []; }
-                            arr.push({id: Date.now().toString(), text: newFact});
-                            localStorage.setItem("re_memory", JSON.stringify(arr));
+                            if (!arr.some(m => m.text === newFact)) {
+                                arr.push({id: Date.now().toString(), text: newFact});
+                                localStorage.setItem("re_memory", JSON.stringify(arr));
+                                if (user) user.update({ unsafeMetadata: { ...user.unsafeMetadata, re_memory: arr } }).catch(console.error);
+                            }
                         } catch {}
                     }
                     accText = accText.replace(/<SAVE_MEMORY>[\s\S]*?<\/SAVE_MEMORY>/g, "");
@@ -1822,24 +1844,26 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
 // Memory View
 // ────────────────────────────────────────────────────────────────────────────
 function MemoryView() {
+  const { user } = useUser();
   const [memories, setMemories] = useState(() => {
+    let cloud = user?.unsafeMetadata?.re_memory || [];
+    let local = [];
     try {
       const raw = localStorage.getItem("re_memory");
-      if (raw && !raw.startsWith("[")) {
-        const migrated = [{ id: Date.now().toString(), text: raw }];
-        localStorage.setItem("re_memory", JSON.stringify(migrated));
-        return migrated;
-      }
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
+      local = raw && !raw.startsWith("[") ? [{id: Date.now().toString(), text: raw}] : (raw ? JSON.parse(raw) : []);
+    } catch {}
+    const merged = [...cloud];
+    for (const lm of local) {
+      if (!merged.some(cm => cm.text === lm.text)) merged.push(lm);
     }
+    return merged;
   });
   const [draft, setDraft] = useState("");
 
   const saveMemories = (newMemories) => {
     setMemories(newMemories);
     localStorage.setItem("re_memory", JSON.stringify(newMemories));
+    if (user) user.update({ unsafeMetadata: { ...user.unsafeMetadata, re_memory: newMemories } }).catch(console.error);
   };
 
   const addMemory = () => {
