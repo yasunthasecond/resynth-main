@@ -397,6 +397,18 @@ async def chat_stream(
         messages = frontend_messages
         
     user_msg_content = body.get("message", "")
+    
+    # Smart Router: Detect complex tasks for DeepSeek
+    hard_keywords = ["solve", "prove", "calculate", "math", "equation", "logic", "debug", "code", "script", "algorithm", "puzzle", "hard"]
+    is_complex = any(k in user_msg_content.lower() for k in hard_keywords)
+    
+    if is_complex:
+        model_name = "deepseek-v4-pro"
+        status_msg = "Solving complex problem..."
+    else:
+        model_name = "qwen-plus-latest"
+        status_msg = "Gathering info..."
+        
     if image_data:
         messages.append({
             "role": "user",
@@ -425,6 +437,9 @@ async def chat_stream(
 
     async def event_stream():
         try:
+            # Yield dynamic status instantly
+            yield f"data: {json.dumps({'type': 'status', 'message': status_msg})}\n\n".encode()
+
             async with httpx.AsyncClient(timeout=None) as client:
                 async with client.stream("POST", f"{UPSTREAM}/chat/completions", json=upstream_payload, headers=headers, timeout=httpx.Timeout(300.0, connect=30.0)) as r:
                     if r.status_code != 200:
