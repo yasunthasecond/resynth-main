@@ -4,6 +4,8 @@ import io
 import json
 import hmac
 import hashlib
+import base64
+import fitz  # PyMuPDF
 import logging
 import urllib.parse
 from datetime import datetime, timezone
@@ -275,6 +277,23 @@ async def generate_image(request: Request, user: Optional[CurrentUser] = Depends
     prompt = (body.get("prompt") or "").strip()
     width = int(body.get("width", 1024))
     height = int(body.get("height", 1024))
+    chat_id = body.get("chat_id")
+    notebook_id = body.get("notebook_id")
+    deep_dive = body.get("deep_dive", False)
+    lit_review = body.get("lit_review", False)
+    
+    # ── NOTEBOOK GROUNDING LOGIC ─────────────────────────────────────────
+    notebook_context = ""
+    if notebook_id and sb_admin and user:
+        try:
+            sources_res = sb_admin.table("sources").select("filename, content").eq("notebook_id", notebook_id).execute()
+            if sources_res.data:
+                notebook_context = "\n\n[ATTACHED NOTEBOOK SOURCES - YOU MUST ONLY USE THESE DOCUMENTS TO ANSWER]:\n"
+                for src in sources_res.data:
+                    notebook_context += f"\n--- Source: {src.get('filename')} ---\n{src.get('content')}\n"
+        except Exception as e:
+            logger.error(f"Failed to fetch notebook sources: {e}")
+    # ──────────────────────────────────────────────────────────────────────
     if not prompt:
         return JSONResponse({"error": "prompt required"}, status_code=400)
     enc = urllib.parse.quote(prompt)
@@ -386,8 +405,13 @@ async def chat_stream(
     
     system_prompt = {
         "role": "system",
-        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. IDENTITY RULES (strictly follow these): If anyone asks who you are, what you are, or who made/created/built you, you must ALWAYS say: 'I am Resynth, an AI assistant created by Resynth engineers.' Never say anything else. You must never identify yourself as DeepSeek, Qwen, ChatGPT, Claude, or any other AI model. You must never mention Alibaba, DeepSeek, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth, created by Resynth engineers. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people (especially things happening in past years like 2024, 2025, and {current_date[-4:]}). NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes. IMPORTANT INSTRUCTION: If the user shares personal details, their name, their projects, or preferences, you MUST immediately output a memory tag exactly like this: <SAVE_MEMORY>The user's name is John</SAVE_MEMORY>. This will automatically save it to their profile." + github_context + google_drive_context + user_memory_context
+        "content": f"You are Resynth, a highly intelligent and helpful AI assistant. The current date is {current_date}. IDENTITY RULES (strictly follow these): If anyone asks who you are, what you are, or who made/created/built you, you must ALWAYS say: 'I am Resynth, an AI assistant created by Resynth engineers.' Never say anything else. You must never identify yourself as DeepSeek, Qwen, ChatGPT, Claude, or any other AI model. You must never mention Alibaba, DeepSeek, Tongyi Lab, OpenAI, Anthropic, or any other corporate creator. You are an independent AI named Resynth, created by Resynth engineers. Be concise, direct, and incredibly smart. You must ALWAYS use internet search to verify facts and answer questions about real-world events, products, or people (especially things happening in past years like 2024, 2025, and {current_date[-4:]}). NEVER hallucinate or invent information. If a user asks about a meme, slang, or internet trend that you do not know, you MUST simply reply: 'I don't know what that means.' You are STRICTLY FORBIDDEN from inventing fake origins, fake meanings, or fake lore for memes or jokes. IMPORTANT INSTRUCTION: If the user shares personal details, their name, their projects, or preferences, you MUST immediately output a memory tag exactly like this: <SAVE_MEMORY>The user's name is John</SAVE_MEMORY>. This will automatically save it to their profile." + github_context + google_drive_context + user_memory_context + notebook_context
     }
+    
+    # If in notebook mode, strictly enforce grounding and disable search
+    if notebook_id:
+        system_prompt["content"] = "You are Resynth, an AI Research Assistant. You have been provided with several documents. YOU MUST ONLY ANSWER BASED ON THE PROVIDED DOCUMENTS. If the answer is not in the documents, say 'I cannot find the answer in the provided sources.' DO NOT use outside knowledge." + notebook_context
+
     
     frontend_messages = body.get("messages", [])
     # Only inject system prompt if it's not already there (though frontend shouldn't send one)
@@ -419,7 +443,7 @@ async def chat_stream(
         "model": model_name,
         "messages": messages,
         "stream": True,
-        "enable_search": True,
+        "enable_search": False if notebook_id else True, # Disable search in Notebook mode
         "temperature": 0.1,
         "max_tokens": 4096
     }
@@ -571,6 +595,150 @@ async def patch_reaction(message_id: str, payload: ReactionPatch, user: CurrentU
         return {"status": "error"}
     sb_admin.table("messages").update({"reaction": payload.reaction}).eq("id", message_id).eq("user_id", user.id).execute()
     return {"ok": True}
+
+
+# ── Notebooks & Sources (NotebookLM Pivot) ───────────────────────────
+@app.get("/api/notebooks")
+async def list_notebooks(user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: return []
+    res = sb_admin.table("notebooks").select("id, title, created_at").eq("user_id", user.id).order("created_at", desc=True).execute()
+    return res.data or []
+
+class NotebookCreate(BaseModel):
+    title: str = "Untitled Notebook"
+
+@app.post("/api/notebooks")
+async def create_notebook(payload: NotebookCreate, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: raise HTTPException(500, "Supabase not configured")
+    res = sb_admin.table("notebooks").insert({"user_id": user.id, "title": payload.title}).execute()
+    return res.data[0] if res.data else {}
+
+@app.get("/api/notebooks/{notebook_id}")
+async def get_notebook(notebook_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: raise HTTPException(500, "Supabase not configured")
+    nb_res = sb_admin.table("notebooks").select("*").eq("id", notebook_id).eq("user_id", user.id).execute()
+    if not nb_res.data: raise HTTPException(404, "Notebook not found")
+    sources_res = sb_admin.table("sources").select("id, filename, created_at").eq("notebook_id", notebook_id).execute()
+    return {"notebook": nb_res.data[0], "sources": sources_res.data or []}
+
+@app.delete("/api/notebooks/{notebook_id}")
+async def delete_notebook(notebook_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: return {"status": "error"}
+    sb_admin.table("notebooks").delete().eq("id", notebook_id).eq("user_id", user.id).execute()
+    return {"ok": True}
+
+class SourceUpload(BaseModel):
+    filename: str
+    base64_data: str
+
+@app.post("/api/notebooks/{notebook_id}/sources")
+async def upload_source(notebook_id: str, payload: SourceUpload, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: raise HTTPException(500, "Supabase not configured")
+    
+    # Extract text using PyMuPDF (fitz)
+    extracted_text = ""
+    try:
+        file_bytes = base64.b64decode(payload.base64_data)
+        if payload.filename.lower().endswith(".pdf"):
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page in doc:
+                extracted_text += page.get_text("text") + "\n"
+            doc.close()
+        else:
+            extracted_text = file_bytes.decode("utf-8")
+    except Exception as e:
+        logger.error(f"Failed to extract source text: {e}")
+        raise HTTPException(400, "Failed to parse document.")
+
+    res = sb_admin.table("sources").insert({
+        "notebook_id": notebook_id,
+        "user_id": user.id,
+        "filename": payload.filename,
+        "content": extracted_text.strip()
+    }).execute()
+    
+    # Return source without the massive content blob
+    inserted = res.data[0] if res.data else {}
+    if "content" in inserted:
+        del inserted["content"]
+    return inserted
+    
+@app.delete("/api/sources/{source_id}")
+async def delete_source(source_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: return {"status": "error"}
+    sb_admin.table("sources").delete().eq("id", source_id).eq("user_id", user.id).execute()
+    return {"ok": True}
+
+@app.post("/api/notebooks/{notebook_id}/podcast")
+async def generate_podcast(notebook_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: raise HTTPException(500, "Supabase not configured")
+    sources = sb_admin.table("sources").select("filename, content").eq("notebook_id", notebook_id).execute()
+    if not sources.data: raise HTTPException(400, "No sources in notebook")
+    
+    context = "\n\n".join([f"--- {s['filename']} ---\n{s['content']}" for s in sources.data])
+    
+    prompt = f"""You are an expert podcast producer. Based ONLY on the following documents, generate a highly engaging, conversational "Audio Overview" script between two hosts: Alex (curious, asks great questions) and Sam (the expert who read the documents). 
+Make it sound natural, use filler words (wow, exactly, right), and deeply explore the core insights of the documents.
+Do NOT use sound effects tags. Just write the script formatted as:
+Alex: [dialogue]
+Sam: [dialogue]
+
+Documents:
+{context[:30000]} # Limit context to avoid token issues for now
+"""
+    
+    payload = {
+        "model": "qwen-plus-latest",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 4000
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {os.environ.get('DASHSCOPE_API_KEY')}", "Content-Type": "application/json"}
+            res = await client.post(f"{UPSTREAM}/chat/completions", json=payload, headers=headers, timeout=60.0)
+            if res.status_code != 200: raise Exception("Upstream error")
+            return {"script": res.json()["choices"][0]["message"]["content"]}
+    except Exception as e:
+        logger.error(f"Podcast gen failed: {e}")
+        raise HTTPException(500, "Failed to generate podcast script")
+
+@app.post("/api/notebooks/{notebook_id}/study-guide")
+async def generate_study_guide(notebook_id: str, user: CurrentUser = Depends(require_user), authorization: str = Header(...)):
+    if not sb_admin: raise HTTPException(500, "Supabase not configured")
+    sources = sb_admin.table("sources").select("filename, content").eq("notebook_id", notebook_id).execute()
+    if not sources.data: raise HTTPException(400, "No sources in notebook")
+    
+    context = "\n\n".join([f"--- {s['filename']} ---\n{s['content']}" for s in sources.data])
+    
+    prompt = f"""Based ONLY on the following documents, generate a comprehensive Markdown Study Guide. 
+It should include:
+1. Executive Summary
+2. Key Concepts & Definitions
+3. Important Themes
+4. FAQ (Frequently Asked Questions)
+
+Documents:
+{context[:30000]}
+"""
+    
+    payload = {
+        "model": "qwen-plus-latest",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.3,
+        "max_tokens": 4000
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {os.environ.get('DASHSCOPE_API_KEY')}", "Content-Type": "application/json"}
+            res = await client.post(f"{UPSTREAM}/chat/completions", json=payload, headers=headers, timeout=60.0)
+            if res.status_code != 200: raise Exception("Upstream error")
+            return {"guide": res.json()["choices"][0]["message"]["content"]}
+    except Exception as e:
+        logger.error(f"Study guide gen failed: {e}")
+        raise HTTPException(500, "Failed to generate study guide")
 
 
 # ── Billing (Dodo Payments) ──────────────────────────────────────────
