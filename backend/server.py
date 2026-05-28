@@ -402,12 +402,7 @@ async def chat_stream(
     hard_keywords = ["solve", "prove", "calculate", "math", "equation", "logic", "debug", "code", "script", "algorithm", "puzzle", "hard"]
     is_complex = any(k in user_msg_content.lower() for k in hard_keywords)
     
-    if is_complex:
-        model_name = "deepseek-v4-pro"
-        status_msg = "Solving complex problem..."
-    else:
-        model_name = "qwen-plus-latest"
-        status_msg = "Gathering info..."
+    model_name = "deepseek-v4-pro" if is_complex else "qwen-plus-latest"
         
     if image_data:
         messages.append({
@@ -437,10 +432,27 @@ async def chat_stream(
 
     async def event_stream():
         try:
-            # Yield dynamic status instantly
-            yield f"data: {json.dumps({'type': 'status', 'message': status_msg})}\n\n".encode()
-
             async with httpx.AsyncClient(timeout=None) as client:
+                # 1. Generate dynamic status quickly
+                status_msg = "Thinking..."
+                try:
+                    status_payload = {
+                        "model": "qwen-plus-latest",
+                        "messages": [{"role": "user", "content": f"Create a very short 2-3 word status message ending in '...' (like 'Writing code...', 'Solving math...', 'Analyzing image...', 'Gathering info...') for this task: '{user_msg_content[:200]}'. ONLY output the status message, nothing else."}],
+                        "temperature": 0.3,
+                        "max_tokens": 10
+                    }
+                    status_res = await client.post(f"{UPSTREAM}/chat/completions", json=status_payload, headers=headers, timeout=3.0)
+                    if status_res.status_code == 200:
+                        status_msg = status_res.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                        if not status_msg.endswith("..."): status_msg += "..."
+                except Exception:
+                    status_msg = "Solving complex problem..." if is_complex else "Gathering info..."
+                    
+                # Yield dynamic status instantly
+                yield f"data: {json.dumps({'type': 'status', 'message': status_msg})}\n\n".encode()
+
+                # 2. Start the main generation stream
                 async with client.stream("POST", f"{UPSTREAM}/chat/completions", json=upstream_payload, headers=headers, timeout=httpx.Timeout(300.0, connect=30.0)) as r:
                     if r.status_code != 200:
                         err_text = await r.aread()
