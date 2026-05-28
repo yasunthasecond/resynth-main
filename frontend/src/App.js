@@ -31,6 +31,13 @@ import {
   Brain,
   Folder,
   FolderPlus,
+  Upload,
+  Headphones,
+  ArrowLeft,
+  ChevronRight,
+  GraduationCap,
+  FileQuestion,
+  Mic,
 } from "lucide-react";
 import { marked } from "marked";
 import hljs from "highlight.js";
@@ -660,6 +667,8 @@ export default function App() {
           <ErrorBoundary><IntegrationsView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} /></ErrorBoundary>
         ) : view === "memory" ? (
           <ErrorBoundary><MemoryView isAuthed={isAuthed} authHeaders={authHeaders} /></ErrorBoundary>
+        ) : view === "notebooks" ? (
+          <ErrorBoundary><NotebookView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} API={API} sendMessage={sendMessage} streaming={streaming} onStop={stopGeneration} /></ErrorBoundary>
         ) : view === "search" ? (
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
         ) : (
@@ -723,6 +732,7 @@ function Sidebar({ open, onToggle, chats, folders, chatFolders, onCreateFolder, 
 
   const items = [
     { id: "search", label: "Search", icon: Search },
+    { id: "notebooks", label: "Notebooks", icon: BookOpen },
     { id: "integrations", label: "Integrations", icon: LayoutGrid },
     { id: "memory", label: "Memory", icon: Brain },
   ];
@@ -1863,7 +1873,7 @@ function MemoryView() {
                 </button>
               </div>
             ))}
-            {memories.length === 0 && (
+          {memories.length === 0 && (
               <div className="text-center py-8 text-textSecondary/50 text-[13px]">No memories saved yet. The AI can also auto-save memories here during conversation!</div>
             )}
           </div>
@@ -1872,3 +1882,342 @@ function MemoryView() {
     </div>
   );
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// NotebookView — NotebookLM-style research notebooks
+// ────────────────────────────────────────────────────────────────────────────
+function NotebookView({ isAuthed, authHeaders, onRequireAuth, API }) {
+  const [notebooks, setNotebooks] = useState([]);
+  const [activeNotebook, setActiveNotebook] = useState(null);
+  const [sources, setSources] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [streaming, setStreaming] = useState(false);
+  const [inputText, setInputText] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [generating, setGenerating] = useState(null); // 'podcast' | 'study-guide' | null
+  const [artifact, setArtifact] = useState(null); // { type, content }
+  const [loadingSources, setLoadingSources] = useState(false);
+  const fileRef = useRef(null);
+  const chatEndRef = useRef(null);
+  const abortRef = useRef(null);
+
+  useEffect(() => { if (isAuthed) fetchNotebooks(); }, [isAuthed]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  const fetchNotebooks = async () => {
+    const h = await authHeaders();
+    const res = await fetch(`${API}/notebooks`, { headers: h });
+    const data = await res.json();
+    setNotebooks(data || []);
+  };
+
+  const fetchNotebook = async (id) => {
+    setLoadingSources(true);
+    const h = await authHeaders();
+    const res = await fetch(`${API}/notebooks/${id}`, { headers: h });
+    const data = await res.json();
+    setSources(data.sources || []);
+    setActiveNotebook(data.notebook);
+    setMessages([]);
+    setArtifact(null);
+    setLoadingSources(false);
+  };
+
+  const createNotebook = async () => {
+    if (!isAuthed) { onRequireAuth(); return; }
+    const title = prompt("Notebook name:", "Untitled Notebook");
+    if (!title) return;
+    const h = await authHeaders();
+    const res = await fetch(`${API}/notebooks`, { method: "POST", headers: { "Content-Type": "application/json", ...h }, body: JSON.stringify({ title }) });
+    const nb = await res.json();
+    await fetchNotebooks();
+    fetchNotebook(nb.id);
+  };
+
+  const deleteNotebook = async (id) => {
+    if (!window.confirm("Delete this notebook and all its sources?")) return;
+    const h = await authHeaders();
+    await fetch(`${API}/notebooks/${id}`, { method: "DELETE", headers: h });
+    if (activeNotebook?.id === id) { setActiveNotebook(null); setSources([]); setMessages([]); }
+    fetchNotebooks();
+  };
+
+  const uploadSource = async (file) => {
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const b64 = String(reader.result).split(",")[1];
+      const h = await authHeaders();
+      await fetch(`${API}/notebooks/${activeNotebook.id}/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ filename: file.name, base64_data: b64 })
+      });
+      await fetchNotebook(activeNotebook.id);
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const deleteSource = async (sourceId) => {
+    const h = await authHeaders();
+    await fetch(`${API}/sources/${sourceId}`, { method: "DELETE", headers: h });
+    setSources(s => s.filter(x => x.id !== sourceId));
+  };
+
+  const sendMessage = async () => {
+    if (!inputText.trim() || streaming || sources.length === 0) return;
+    const userMsg = { role: "user", content: inputText };
+    setMessages(m => [...m, userMsg, { role: "assistant", content: "", streaming: true, status: "Reading sources..." }]);
+    setInputText("");
+    setStreaming(true);
+
+    const h = await authHeaders();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const history = messages.map(m => ({ role: m.role, content: m.content || "" }));
+    const resp = await fetch(`${API}/chat/stream`, {
+      method: "POST", signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...h },
+      body: JSON.stringify({ message: inputText, messages: history, notebook_id: activeNotebook.id })
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", acc = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const raw = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        for (const line of raw.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          try {
+            const evt = JSON.parse(line.slice(5).trim());
+            if (evt.type === "done") break;
+            if (evt.type === "text" && evt.content) {
+              acc = evt.content;
+              setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, content: acc, status: null } : x));
+            } else if (evt.type === "token" && evt.content) {
+              acc += evt.content;
+              setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, content: acc, status: null } : x));
+            } else if (evt.type === "status") {
+              setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, status: evt.message } : x));
+            }
+          } catch {}
+        }
+      }
+    }
+    setMessages(m => m.map((x, i, a) => i === a.length - 1 ? { ...x, streaming: false, status: null } : x));
+    setStreaming(false);
+  };
+
+  const generateArtifact = async (type) => {
+    if (sources.length === 0) return;
+    setGenerating(type);
+    setArtifact(null);
+    const h = await authHeaders();
+    const endpoint = type === "podcast" ? "podcast" : "study-guide";
+    const res = await fetch(`${API}/notebooks/${activeNotebook.id}/${endpoint}`, { method: "POST", headers: h });
+    const data = await res.json();
+    setArtifact({ type, content: type === "podcast" ? data.script : data.guide });
+    setGenerating(null);
+  };
+
+  if (!isAuthed) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+        <BookOpen className="w-12 h-12 text-textSecondary/40" />
+        <h2 className="text-xl font-bold text-white">Notebooks</h2>
+        <p className="text-textSecondary text-center max-w-sm">Sign in to create research notebooks, upload documents, and generate AI-powered insights.</p>
+        <button onClick={onRequireAuth} className="px-6 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors">Sign in</button>
+      </div>
+    );
+  }
+
+  // ── Artifact overlay ──────────────────────────────────────────────────────
+  if (artifact) {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-white/[0.06]">
+          <button onClick={() => setArtifact(null)} className="p-2 rounded-lg hover:bg-white/[0.05] text-textSecondary hover:text-white transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          {artifact.type === "podcast" ? <Mic className="w-4 h-4 text-purple-400" /> : <GraduationCap className="w-4 h-4 text-emerald-400" />}
+          <h2 className="text-sm font-semibold text-white">{artifact.type === "podcast" ? "Audio Overview Script" : "Study Guide"}</h2>
+          <span className="ml-auto text-xs text-textSecondary">{activeNotebook?.title}</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-10">
+          <pre className="whitespace-pre-wrap font-sans text-[14px] leading-[1.85] text-white/85 max-w-3xl mx-auto">{artifact.content}</pre>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Notebooks list (no active notebook) ───────────────────────────────────
+  if (!activeNotebook) {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Notebooks</h1>
+            <p className="text-xs text-textSecondary mt-0.5">Upload documents, ask questions, generate insights</p>
+          </div>
+          <button onClick={createNotebook} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-black text-[13px] font-semibold hover:bg-emerald-400 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+            <Plus className="w-4 h-4" /> New Notebook
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {notebooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center">
+                <BookOpen className="w-7 h-7 text-textSecondary/50" />
+              </div>
+              <p className="text-textSecondary text-[14px] max-w-xs">No notebooks yet. Create one and upload your PDFs or text files to start researching.</p>
+              <button onClick={createNotebook} className="px-5 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white text-sm font-medium hover:bg-white/[0.1] transition-colors">
+                Create your first notebook
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {notebooks.map(nb => (
+                <div key={nb.id} onClick={() => fetchNotebook(nb.id)} className="group relative bg-white/[0.03] border border-white/[0.07] hover:border-emerald-500/30 hover:bg-white/[0.05] rounded-2xl p-5 cursor-pointer transition-all duration-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <BookOpen className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); deleteNotebook(nb.id); }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-textSecondary hover:text-red-400 transition-all">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <h3 className="text-[14px] font-semibold text-white truncate mb-1">{nb.title}</h3>
+                  <p className="text-[12px] text-textSecondary">{new Date(nb.created_at).toLocaleDateString()}</p>
+                  <ChevronRight className="absolute right-4 bottom-5 w-4 h-4 text-textSecondary/30 group-hover:text-emerald-400 transition-colors" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Notebook detail view (split pane) ─────────────────────────────────────
+  return (
+    <div className="flex-1 flex h-full overflow-hidden">
+      {/* Sources Panel */}
+      <div className="w-[280px] shrink-0 border-r border-white/[0.06] flex flex-col bg-[#090B0F]">
+        <div className="flex items-center gap-2 px-4 py-4 border-b border-white/[0.05]">
+          <button onClick={() => { setActiveNotebook(null); setSources([]); setMessages([]); }} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-textSecondary hover:text-white transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </button>
+          <h2 className="text-[13px] font-semibold text-white truncate flex-1">{activeNotebook.title}</h2>
+        </div>
+
+        <div className="px-3 py-3 border-b border-white/[0.05]">
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/[0.15] hover:border-emerald-500/40 hover:bg-emerald-500/5 text-[12.5px] text-textSecondary hover:text-emerald-400 transition-all">
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            {uploading ? "Uploading..." : "Add source (PDF / TXT)"}
+          </button>
+          <input ref={fileRef} type="file" accept=".pdf,.txt" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadSource(f); e.target.value = ""; }} />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-1.5">
+          {loadingSources ? (
+            <div className="flex items-center justify-center py-8"><Loader2 className="w-4 h-4 animate-spin text-textSecondary" /></div>
+          ) : sources.length === 0 ? (
+            <div className="text-center py-8 text-[12px] text-textSecondary/50 px-4">No sources yet. Upload a PDF or text file to get started.</div>
+          ) : sources.map(src => (
+            <div key={src.id} className="group flex items-center gap-2.5 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05]">
+              <FileText className="w-3.5 h-3.5 text-emerald-400/70 shrink-0" />
+              <span className="text-[12px] text-textSecondary flex-1 truncate">{src.filename}</span>
+              <button onClick={() => deleteSource(src.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:text-red-400 text-textSecondary/50 transition-all">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Generate buttons */}
+        <div className="px-3 py-3 border-t border-white/[0.05] flex flex-col gap-2">
+          <button onClick={() => generateArtifact("podcast")} disabled={generating !== null || sources.length === 0} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-[12.5px] font-medium transition-colors">
+            {generating === "podcast" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Headphones className="w-3.5 h-3.5" />}
+            Audio Overview
+          </button>
+          <button onClick={() => generateArtifact("study-guide")} disabled={generating !== null || sources.length === 0} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-[12.5px] font-medium transition-colors">
+            {generating === "study-guide" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GraduationCap className="w-3.5 h-3.5" />}
+            Study Guide
+          </button>
+        </div>
+      </div>
+
+      {/* Chat Panel */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {sources.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
+            <FileQuestion className="w-10 h-10 text-textSecondary/30" />
+            <p className="text-[14px] text-textSecondary max-w-xs">Upload at least one source to start chatting with your documents.</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-1">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+            </div>
+            <h3 className="text-white font-semibold">{activeNotebook.title}</h3>
+            <p className="text-[13px] text-textSecondary max-w-sm">{sources.length} source{sources.length > 1 ? "s" : ""} loaded. Ask anything about your documents.</p>
+            {[`Summarize the key findings`, `What are the main themes?`, `List the key concepts`].map(q => (
+              <button key={q} onClick={() => { setInputText(q); }} className="px-4 py-2 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-[13px] text-textSecondary hover:text-white transition-colors">
+                {q}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 flex flex-col gap-4">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
+                {m.role === "user" ? (
+                  <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-white/[0.07] border border-white/[0.06] text-[14px] text-white leading-relaxed">{m.content}</div>
+                ) : (
+                  <div className="max-w-[85%]">
+                    {m.streaming && !m.content ? (
+                      <div className="flex items-center gap-2 text-[12.5px] text-textSecondary">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> {m.status || "Reading sources..."}
+                      </div>
+                    ) : (
+                      <div className="text-[14px] leading-[1.8] text-white/90" dangerouslySetInnerHTML={{ __html: marked.parse(m.content || "") }} />
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="px-4 md:px-8 py-4 border-t border-white/[0.05]">
+          <div className="flex items-end gap-2 bg-white/[0.04] border border-white/[0.08] focus-within:border-emerald-500/40 rounded-2xl px-4 py-3 transition-colors">
+            <textarea
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+              placeholder={sources.length === 0 ? "Upload a source to start chatting..." : "Ask about your documents..."}
+              disabled={sources.length === 0 || streaming}
+              rows={1}
+              className="flex-1 bg-transparent text-[14px] text-white placeholder:text-textSecondary/50 resize-none outline-none max-h-[120px] disabled:opacity-40"
+            />
+            <button onClick={sendMessage} disabled={!inputText.trim() || streaming || sources.length === 0} className="p-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0">
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-[11px] text-textSecondary/40 text-center mt-2">Answers are strictly grounded in your uploaded sources</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
