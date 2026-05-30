@@ -271,10 +271,6 @@ export default function App() {
   const showAlert = (message) => new Promise(res => setModal({ type: 'alert', message, onConfirm: () => { setModal(null); res(); } }));
   const showPrompt = (message, defaultValue = "") => new Promise(res => setModal({ type: 'prompt', message, defaultValue, onConfirm: (val) => { setModal(null); res(val); }, onCancel: () => { setModal(null); res(null); } }));
 
-  const [modal, setModal] = useState(null);
-  const showAlert = (message) => new Promise(res => setModal({ type: 'alert', message, onConfirm: () => { setModal(null); res(); } }));
-  const showPrompt = (message, defaultValue = "") => new Promise(res => setModal({ type: 'prompt', message, defaultValue, onConfirm: (val) => { setModal(null); res(val); }, onCancel: () => { setModal(null); res(null); } }));
-
   const createFolder = async () => {
     if (!isAuthed) { showAlert("Must be signed in!"); return; }
     const name = await showPrompt("Folder name:");
