@@ -1865,6 +1865,19 @@ function MemoryView() {
     return merged;
   });
   const [draft, setDraft] = useState("");
+  const [showTestMode, setShowTestMode] = useState(false);
+  const [videoBg, setVideoBg] = useState("#000");
+
+  const handleVideoLoaded = (e) => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1; canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(e.target, 0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      setVideoBg(`rgb(${r},${g},${b})`);
+    } catch(err) { console.error("Could not extract video color:", err); }
+  };
 
   const saveMemories = (newMemories) => {
     setMemories(newMemories);
@@ -1881,6 +1894,24 @@ function MemoryView() {
   const deleteMemory = (id) => {
     saveMemories(memories.filter((m) => m.id !== id));
   };
+
+  if (showTestMode) {
+    return (
+      <div className="flex-1 flex items-center justify-center relative transition-colors duration-500" style={{ backgroundColor: videoBg }}>
+        <button onClick={() => setShowTestMode(false)} className="absolute top-6 left-6 p-2 text-white/50 hover:text-white transition-colors bg-white/[0.03] rounded-lg hover:bg-white/[0.08] z-10">
+          <X className="w-5 h-5" />
+        </button>
+        <video 
+          src="/voice-feature.mp4" 
+          autoPlay 
+          loop 
+          muted 
+          onLoadedData={handleVideoLoaded}
+          className="max-w-full max-h-full"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-10 animate-fadeUp">
@@ -1914,6 +1945,16 @@ function MemoryView() {
           {memories.length === 0 && (
               <div className="text-center py-8 text-textSecondary/50 text-[13px]">No memories saved yet. The AI can also auto-save memories here during conversation!</div>
             )}
+          </div>
+          
+          <div className="mt-8 pt-8 border-t border-white/[0.08] flex items-center justify-between">
+            <div>
+              <h3 className="text-[15px] font-semibold text-white mb-1">Upcoming Voice Feature</h3>
+              <p className="text-[13px] text-textSecondary">Test the new animation flow</p>
+            </div>
+            <button onClick={() => setShowTestMode(true)} className="px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-[13px] font-medium hover:bg-emerald-500/20 transition-colors">
+              Test
+            </button>
           </div>
         </div>
       </div>
