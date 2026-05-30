@@ -692,7 +692,7 @@ export default function App() {
         ) : view === "images" ? (
           <ErrorBoundary><ImagesView authHeaders={authHeaders} /></ErrorBoundary>
         ) : view === "integrations" ? (
-          <ErrorBoundary><IntegrationsView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} /></ErrorBoundary>
+          <ErrorBoundary><IntegrationsView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} showAlert={showAlert} /></ErrorBoundary>
         ) : view === "memory" ? (
           <ErrorBoundary><MemoryView isAuthed={isAuthed} authHeaders={authHeaders} /></ErrorBoundary>
         ) : view === "notebooks" ? (
@@ -718,6 +718,7 @@ export default function App() {
               activeIntegrations={activeIntegrations}
               setView={setView}
               loadingChatId={loadingChatId}
+              showAlert={showAlert}
             />
           </ErrorBoundary>
         )}
@@ -966,7 +967,7 @@ function GuestBanner({ usage, onSignIn }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Chat panel
 // ────────────────────────────────────────────────────────────────────────────
-function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onExportChat, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView, loadingChatId }) {
+function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, onReact, onExportChat, plan, limitInfo, onUpgrade, onStop, activeApp, setActiveApp, activeIntegrations, setView, loadingChatId, showAlert }) {
   const scrollRef = useRef(null);
   useEffect(() => {
     const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight;
@@ -1003,7 +1004,7 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
           </div>
         )}
       </div>
-      <Composer onSend={onSend} streaming={streaming} isResearchMode={isResearchMode} onStop={onStop} activeApp={activeApp} setActiveApp={setActiveApp} activeIntegrations={activeIntegrations} setView={setView} />
+      <Composer onSend={onSend} streaming={streaming} isResearchMode={isResearchMode} onStop={onStop} activeApp={activeApp} setActiveApp={setActiveApp} activeIntegrations={activeIntegrations} setView={setView} showAlert={showAlert} />
     </div>
   );
 }
@@ -1267,7 +1268,7 @@ function QuotaCard({ info, plan, onUpgrade }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Composer with file attach + mode pills inside
 // ────────────────────────────────────────────────────────────────────────────
-function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setActiveApp, activeIntegrations, setView }) {
+function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setActiveApp, activeIntegrations, setView, showAlert }) {
   const [text, setText] = useState("");
   const [deepDive, setDeepDive] = useState(false);
   const [litReview, setLitReview] = useState(false);
@@ -1745,7 +1746,7 @@ function PricingView({ isAuthed, authHeaders, billing, onRequireAuth }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Integrations View
 // ────────────────────────────────────────────────────────────────────────────
-function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations, fetchIntegrations }) {
+function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations, fetchIntegrations, showAlert }) {
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(null);
 
