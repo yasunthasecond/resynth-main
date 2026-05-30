@@ -493,6 +493,33 @@ async def chat_stream(
     async def event_stream():
         try:
             async with httpx.AsyncClient(timeout=None) as client:
+                # 0. Pre-Search (Brave Search API)
+                brave_api_key = os.environ.get("BRAVE_API_KEY")
+                if not notebook_id and brave_api_key:
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Searching the web...'})}\n\n".encode()
+                    try:
+                        # Extract intent for better searching
+                        sq_res = await client.post(f"{UPSTREAM}/chat/completions", json={
+                            "model": "qwen-plus-latest",
+                            "messages": [{"role": "user", "content": f"Extract the core search query from this message to find real-time information: '{user_msg_content[:500]}'. Return ONLY the short search query text, no quotes."}],
+                            "temperature": 0.1, "max_tokens": 20
+                        }, headers=headers, timeout=5.0)
+                        
+                        search_query = user_msg_content[:100]
+                        if sq_res.status_code == 200:
+                            search_query = sq_res.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                            
+                        # Call Brave Search
+                        b_res = await client.get("https://api.search.brave.com/res/v1/web/search", params={"q": search_query, "count": 5}, headers={"Accept": "application/json", "X-Subscription-Token": brave_api_key}, timeout=5.0)
+                        if b_res.status_code == 200:
+                            results = b_res.json().get("web", {}).get("results", [])
+                            if results:
+                                context_text = "[LIVE WEB SEARCH RESULTS (Brave Search)]\n" + "\n".join([f"- {r.get('title')}: {r.get('description')} ({r.get('url')})" for r in results])
+                                upstream_payload["messages"].insert(-1, {"role": "system", "content": context_text})
+                                upstream_payload["enable_search"] = False # Disable native search since we have Brave
+                    except Exception as e:
+                        logger.error(f"Brave search error: {e}")
+
                 # 1. Generate dynamic status quickly
                 status_msg = "Thinking..."
                 try:
