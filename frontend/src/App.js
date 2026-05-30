@@ -39,6 +39,11 @@ import {
   GraduationCap,
   FileQuestion,
   Mic,
+  Menu,
+  Bell,
+  PenSquare,
+  User,
+  Home,
 } from "lucide-react";
 import { marked } from "marked";
 import hljs from "highlight.js";
@@ -673,7 +678,7 @@ export default function App() {
         usage={usage}
       />
 
-      <main className="flex-1 flex flex-col min-w-0 relative">
+      <main className="flex-1 flex flex-col min-w-0 relative pb-[64px] md:pb-0">
         <TopBar
           plan={profile.plan}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
@@ -723,6 +728,30 @@ export default function App() {
           </ErrorBoundary>
         )}
       </main>
+
+      {/* Mobile Bottom Navigation & FAB */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-[64px] bg-[#0A0C10] border-t border-white/[0.04] flex items-center justify-around px-2 z-[60] shadow-[0_-8px_30px_rgba(0,0,0,0.3)]">
+        <button onClick={() => setView('chat')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'chat' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
+          <Home className="w-5 h-5 mb-1" />
+        </button>
+        <button onClick={() => setView('notebooks')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'notebooks' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
+          <BookOpen className="w-5 h-5 mb-1" />
+        </button>
+        
+        <div className="w-14" /> {/* Spacer for FAB */}
+        
+        <button onClick={() => setView('memory')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'memory' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
+          <Brain className="w-5 h-5 mb-1" />
+        </button>
+        <button onClick={() => setView('profile')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'profile' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
+          <User className="w-5 h-5 mb-1" />
+        </button>
+        
+        {/* FAB */}
+        <button onClick={() => { setView('chat'); newChat(); }} className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-[#1f2937] hover:bg-[#374151] rounded-full flex items-center justify-center shadow-[0_4px_14px_rgba(0,0,0,0.5)] border border-white/[0.1] text-white transition-transform active:scale-95 z-[70]">
+          <PenSquare className="w-6 h-6" />
+        </button>
+      </div>
 
       {showAuth && <AuthPage onClose={() => setShowAuth(false)} />}
     </div>
@@ -902,47 +931,63 @@ function TopBar({ plan, onToggleSidebar, sidebarOpen, isAuthed, onShowAuth, onSh
   }, []);
 
   return (
-    <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.04]">
-      <div className="flex items-center gap-3">
-        {!sidebarOpen && (
-          <button onClick={onToggleSidebar} className="w-9 h-9 grid place-items-center rounded-lg bg-white/[0.04] border border-white/[0.07] text-textSecondary hover:text-white">
-            <ChevronLeft className="w-4 h-4 rotate-180" />
-          </button>
-        )}
+    <>
+      {/* Mobile Top Bar */}
+      <div className="flex md:hidden items-center justify-between px-5 py-4 border-b border-white/[0.04]">
+        <button onClick={onToggleSidebar} className="text-white hover:opacity-80">
+          <Menu className="w-6 h-6" />
+        </button>
+        <div className="text-[22px] font-bold tracking-tight select-none">
+          <span className="text-white">R</span><span className="text-emerald-500">e</span>
+        </div>
+        <button className="text-white hover:opacity-80 relative">
+          <Bell className="w-5 h-5" />
+        </button>
       </div>
-      <div className="flex items-center gap-2">
-        {messages?.length > 0 && (
-          <div className="relative" ref={exportRef}>
-            <button
-              data-testid="topbar-save-btn"
-              onClick={() => setShowExport(!showExport)}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-textSecondary hover:text-white border border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02] transition-colors"
-              title="Save Conversation"
-            >
-              <Download className="w-3.5 h-3.5" /> Save
+
+      {/* Desktop Top Bar */}
+      <div className="hidden md:flex items-center justify-between px-5 py-3.5 border-b border-white/[0.04]">
+        <div className="flex items-center gap-3">
+          {!sidebarOpen && (
+            <button onClick={onToggleSidebar} className="w-9 h-9 grid place-items-center rounded-lg bg-white/[0.04] border border-white/[0.07] text-textSecondary hover:text-white">
+              <ChevronLeft className="w-4 h-4 rotate-180" />
             </button>
-            {showExport && (
-              <div className="absolute right-0 mt-2 w-36 bg-[#0f172a] border border-white/[0.08] rounded-lg shadow-xl overflow-hidden z-50 flex flex-col animate-fadeUp">
-                <button onClick={() => { setShowExport(false); onExportChat("pdf"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">PDF Document</button>
-                <button onClick={() => { setShowExport(false); onExportChat("md"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">Markdown</button>
-                <button onClick={() => { setShowExport(false); onExportChat("txt"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05]">Plain Text</button>
-              </div>
-            )}
-          </div>
-        )}
-        {isAuthed ? (
-          plan === "free" && (
-            <button data-testid="topbar-upgrade" onClick={onShowPricing} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
-              Upgrade
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {messages?.length > 0 && (
+            <div className="relative" ref={exportRef}>
+              <button
+                data-testid="topbar-save-btn"
+                onClick={() => setShowExport(!showExport)}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-textSecondary hover:text-white border border-white/[0.06] hover:border-white/[0.12] bg-white/[0.02] transition-colors"
+                title="Save Conversation"
+              >
+                <Download className="w-3.5 h-3.5" /> Save
+              </button>
+              {showExport && (
+                <div className="absolute right-0 mt-2 w-36 bg-[#0f172a] border border-white/[0.08] rounded-lg shadow-xl overflow-hidden z-50 flex flex-col animate-fadeUp">
+                  <button onClick={() => { setShowExport(false); onExportChat("pdf"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">PDF Document</button>
+                  <button onClick={() => { setShowExport(false); onExportChat("md"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05] border-b border-white/[0.04]">Markdown</button>
+                  <button onClick={() => { setShowExport(false); onExportChat("txt"); }} className="px-4 py-2.5 text-left text-xs text-white hover:bg-white/[0.05]">Plain Text</button>
+                </div>
+              )}
+            </div>
+          )}
+          {isAuthed ? (
+            plan === "free" && (
+              <button data-testid="topbar-upgrade" onClick={onShowPricing} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
+                Upgrade
+              </button>
+            )
+          ) : (
+            <button data-testid="topbar-signin" onClick={onShowAuth} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
+              Sign in
             </button>
-          )
-        ) : (
-          <button data-testid="topbar-signin" onClick={onShowAuth} className="btn-transparent rounded-lg px-3 py-1.5 text-xs font-semibold">
-            Sign in
-          </button>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1056,18 +1101,32 @@ function Hero({ onPick, isResearchMode }) {
   }, [displayedText, isDeleting, topicIndex, topics]);
 
   return (
-    <div className="min-h-full flex flex-col items-center justify-center px-4 py-12 animate-fadeUp">
-      <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2 h-[48px] flex items-center justify-center transition-all duration-500">
-        {isResearchMode ? "Deep " : ""}
-        <span className="gradient-text">
-          {isResearchMode ? "Research Lab" : displayedText}
-        </span>
-        {!isResearchMode && <span className="animate-pulse ml-1 inline-block w-1.5 h-8 sm:h-10 bg-emerald-500 rounded-full" />}
-      </h1>
-      <p className={`text-sm sm:text-base text-textSecondary text-center max-w-md mb-8 transition-opacity duration-500 ${isDeleting ? "opacity-0" : "opacity-100"}`}>
-        {isResearchMode ? "Multi-step research with citations." : subTopics[topicIndex % subTopics.length]}
-      </p>
-    </div>
+    <>
+      <div className="hidden md:flex min-h-full flex-col items-center justify-center px-4 py-12 animate-fadeUp">
+        <h1 className="font-display text-[28px] sm:text-[36px] font-bold tracking-tight text-center mb-2 h-[48px] flex items-center justify-center transition-all duration-500">
+          {isResearchMode ? "Deep " : ""}
+          <span className="gradient-text">
+            {isResearchMode ? "Research Lab" : displayedText}
+          </span>
+          {!isResearchMode && <span className="animate-pulse ml-1 inline-block w-1.5 h-8 sm:h-10 bg-emerald-500 rounded-full" />}
+        </h1>
+        <p className={`text-sm sm:text-base text-textSecondary text-center max-w-md mb-8 transition-opacity duration-500 ${isDeleting ? "opacity-0" : "opacity-100"}`}>
+          {isResearchMode ? "Multi-step research with citations." : subTopics[topicIndex % subTopics.length]}
+        </p>
+      </div>
+      
+      {/* Mobile Home View */}
+      <div className="md:hidden flex flex-col w-full h-full px-5 pt-8 pb-24 animate-fadeUp">
+        <h1 className="text-[24px] font-bold text-white mb-6 tracking-tight">
+          Hello {user ? (user.firstName || user.fullName) : 'Yasuntha'},
+        </h1>
+        
+        {/* Gradient Card */}
+        <div className="w-full aspect-[1.8] rounded-[24px] bg-gradient-to-br from-[#2d1b4e] via-[#1f1a3a] to-[#152e3b] shadow-2xl relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+        </div>
+      </div>
+    </>
   );
 }
 
