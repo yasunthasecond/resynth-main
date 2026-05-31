@@ -251,7 +251,7 @@ export default function App() {
   const [streaming, setStreaming] = useState(false);
   const [usage, setUsage] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 768);
   const [billingStatus, setBillingStatus] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null); // {plan, used, limit, unlock_at} when over
   
