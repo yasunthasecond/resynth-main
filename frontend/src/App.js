@@ -1195,15 +1195,16 @@ function Hero({ onPick, isResearchMode }) {
       </div>
       
       {/* Mobile Home View */}
-      <div className="md:hidden flex flex-col w-full h-full px-5 pt-8 pb-24 animate-fadeUp">
-        <h1 className="text-[24px] font-bold text-white mb-6 tracking-tight">
-          Hello {user ? (user.firstName || user.fullName) : 'Yasuntha'},
-        </h1>
-        
-        {/* Gradient Card */}
-        <div className="w-full aspect-[1.8] rounded-[24px] bg-gradient-to-br from-[#2d1b4e] via-[#1f1a3a] to-[#152e3b] shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+      <div className="md:hidden flex flex-col w-full h-full px-5 pt-8 pb-24 animate-fadeUp items-center justify-center">
+        <div className="w-full max-w-sm h-[280px] relative pointer-events-auto flex items-center justify-center">
+          <Spline 
+            scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" 
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
+        <h1 className="text-[22px] font-bold text-white mt-8 tracking-tight text-center">
+          What are we exploring?
+        </h1>
       </div>
     </>
   );
@@ -1239,25 +1240,24 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       data-testid={m.role === "user" ? "msg-user" : "msg-ai"}
+      className={m.role === "user" ? "flex justify-end w-full" : "w-full"}
     >
       {m.role === "user" ? (
-        <div className="self-end max-w-[85%]">
-          <div className="rounded-2xl rounded-tr-md px-4 py-3 bg-white/[0.06] border border-white/[0.06] text-[14.5px] leading-relaxed whitespace-pre-wrap flex flex-col items-end">
-            {m.image && (
-              <div className="mb-2 rounded-lg border border-white/[0.08] overflow-hidden self-end">
-                <img src={m.image} alt="Upload" className="max-w-[200px] max-h-[200px] object-cover" />
-              </div>
-            )}
-            {m.pdf && (
-              <div className="mb-2 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
-                <FileText className="w-5 h-5 text-emerald-400" />
-                <span className="text-[13px] text-textPrimary font-medium truncate max-w-[200px]">{m.pdf}</span>
-              </div>
-            )}
-            {!(m.content === "[image]" || m.content === "[pdf]") && (
-              <div className="text-right">{m.content}</div>
-            )}
-          </div>
+        <div className="max-w-[85%] rounded-2xl rounded-tr-md px-4 py-3 bg-white/[0.06] border border-white/[0.06] text-[14.5px] leading-relaxed whitespace-pre-wrap flex flex-col items-end text-left w-fit shadow-md">
+          {m.image && (
+            <div className="mb-2 rounded-lg border border-white/[0.08] overflow-hidden">
+              <img src={m.image} alt="Upload" className="max-w-[200px] max-h-[200px] object-cover" />
+            </div>
+          )}
+          {m.pdf && (
+            <div className="mb-2 inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2">
+              <FileText className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span className="text-[13px] text-textPrimary font-medium truncate max-w-[200px]">{m.pdf}</span>
+            </div>
+          )}
+          {!(m.content === "[image]" || m.content === "[pdf]") && (
+            <div>{m.content}</div>
+          )}
         </div>
       ) : (
         <div className="flex" ref={bubbleRef}>
