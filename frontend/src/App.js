@@ -790,9 +790,9 @@ function Sidebar({ open, onToggle, chats, folders, chatFolders, onCreateFolder, 
 
   const items = [
     { id: "search", label: "Search", icon: Search },
-    { id: "notebooks", label: "Notebooks", icon: BookOpen },
+    { id: "notebooks", label: "Notebooks", icon: BookOpen, hideOnMobile: true },
     { id: "integrations", label: "Integrations", icon: LayoutGrid },
-    { id: "memory", label: "Memory", icon: Brain },
+    { id: "memory", label: "Memory", icon: Brain, hideOnMobile: true },
   ];
 
   return (
@@ -831,7 +831,7 @@ function Sidebar({ open, onToggle, chats, folders, chatFolders, onCreateFolder, 
                 key={item.id}
                 data-testid={`sidebar-nav-${item.id}`}
                 onClick={() => onSelectView(item.id)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active ? "text-white bg-white/[0.05]" : "text-textSecondary hover:text-white hover:bg-white/[0.03]"}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${item.hideOnMobile ? "hidden md:flex" : "flex"} ${active ? "text-white bg-white/[0.05]" : "text-textSecondary hover:text-white hover:bg-white/[0.03]"}`}
               >
                 <Icon className="w-4 h-4" />
                 {item.label}
