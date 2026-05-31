@@ -708,7 +708,7 @@ export default function App() {
         ) : view === "search" ? (
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
         ) : view === "home" ? (
-          <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} /></ErrorBoundary>
+          <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} chats={chats} openChat={openChat} /></ErrorBoundary>
         ) : view === "profile" ? (
           <ErrorBoundary><ProfileView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} showAlert={showAlert} /></ErrorBoundary>
         ) : (
@@ -1020,12 +1020,16 @@ function GuestBanner({ usage, onSignIn }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Home Dashboard
 // ────────────────────────────────────────────────────────────────────────────
-function HomeDashboard({ user, setView, newChat }) {
+function HomeDashboard({ user, setView, newChat, chats = [], openChat }) {
+  const recentChats = chats.slice(0, 3);
+  const totalChats = chats.length;
+  const memoryCount = user?.unsafeMetadata?.re_memory?.length || 0;
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-start pt-8 pb-32 px-5 overflow-y-auto animate-fadeUp">
       {/* 3D Spline Header */}
       <div className="w-full max-w-4xl h-[380px] rounded-[32px] overflow-hidden relative shadow-2xl bg-[#0A0C10] border border-white/[0.04] flex items-center justify-center">
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 pointer-events-auto">
           <Spline scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" />
         </div>
       </div>
@@ -1039,10 +1043,10 @@ function HomeDashboard({ user, setView, newChat }) {
             <h2 className="text-lg font-bold text-white">AI Weekly Review</h2>
           </div>
           <p className="text-sm text-textSecondary leading-relaxed mb-6">
-            This week you explored quantum computing logic and refined your React architecture. Your knowledge graph has expanded by 12 new core concepts.
+            You've started <strong className="text-white">{totalChats}</strong> conversations and expanded your knowledge graph with <strong className="text-white">{memoryCount}</strong> saved memories. Your intelligence engine is growing!
           </p>
           <button onClick={() => { setView('memory') }} className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl text-sm font-medium text-white transition-colors border border-white/[0.05]">
-            View Insights
+            View Memory Insights
           </button>
         </div>
 
@@ -1053,16 +1057,19 @@ function HomeDashboard({ user, setView, newChat }) {
             <h2 className="text-lg font-bold text-white">Recent Projects</h2>
           </div>
           <div className="flex flex-col gap-2">
-            {[
-              { title: "Quantum Logic Research", time: "2 hours ago" },
-              { title: "Mobile UI Architecture", time: "Yesterday" },
-              { title: "Database Migration Plan", time: "3 days ago" }
-            ].map((proj, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]" onClick={() => { setView('chat'); newChat(); }}>
-                <span className="text-sm font-medium text-white/90 truncate">{proj.title}</span>
-                <span className="text-xs text-textSecondary shrink-0">{proj.time}</span>
+            {recentChats.length > 0 ? recentChats.map((c, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]" onClick={() => { openChat(c.id); }}>
+                <span className="text-sm font-medium text-white/90 truncate mr-4">{c.title || "New Chat"}</span>
+                <span className="text-[11px] font-mono text-textSecondary/50 shrink-0 uppercase tracking-wider">
+                  {new Date(c.updatedAt || Date.now()).toLocaleDateString()}
+                </span>
               </div>
-            ))}
+            )) : (
+              <div className="py-4 text-center text-sm text-textSecondary/50">
+                No recent projects yet.
+                <button onClick={() => { setView('chat'); newChat(); }} className="mt-3 block w-full px-3 py-2 bg-white/[0.02] rounded-lg text-emerald-400 hover:bg-white/[0.05] transition-colors">Start a new chat</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1085,9 +1092,17 @@ function ChatPanel({ messages, onSend, streaming, isResearchMode, onRegenerate, 
     <div className="flex-1 flex flex-col min-h-0 relative">
       <div ref={scrollRef} className="flex-1 overflow-y-auto" data-testid="chat-scroll">
         {loadingChatId ? (
-          <div className="min-h-full flex flex-col items-center justify-center animate-fadeUp">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500 mb-4" />
-            <p className="text-textSecondary text-sm">Loading chat history...</p>
+          <div className="min-h-[400px] flex flex-col justify-end max-w-3xl mx-auto w-full px-4 sm:px-6 pb-20 gap-8 animate-fadeUp">
+            {/* User Message Skeleton */}
+            <div className="self-end max-w-[70%] w-full">
+              <div className="h-[60px] bg-white/[0.04] rounded-2xl rounded-tr-md animate-pulse border border-white/[0.02]" />
+            </div>
+            {/* AI Message Skeleton */}
+            <div className="self-start max-w-[80%] w-full flex flex-col gap-3 mt-4">
+              <div className="h-4 bg-white/[0.04] rounded-md animate-pulse w-full" />
+              <div className="h-4 bg-white/[0.04] rounded-md animate-pulse w-[90%]" />
+              <div className="h-4 bg-white/[0.04] rounded-md animate-pulse w-[60%]" />
+            </div>
           </div>
         ) : empty ? (
           <Hero onPick={(t) => onSend(t)} isResearchMode={isResearchMode} />
@@ -1258,13 +1273,10 @@ function MessageBubble({ m, isLast, onRegenerate, onReact, onSend, streaming }) 
             
             <div className="md text-[14.5px]">
               {streaming && !m.content ? (
-                <div className="flex items-center gap-3 text-[13px] text-textSecondary font-mono mt-1">
-                  <div className="flex gap-1.5 items-center">
-                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0 }} />
-                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0.2 }} />
-                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1, repeat: Infinity, delay: 0.4 }} />
-                  </div>
-                  <span className="animate-pulse">{m.status || "Thinking..."}</span>
+                <div className="flex flex-col gap-3 mt-2 w-full max-w-[400px]">
+                  <div className="h-[16px] bg-white/[0.04] rounded-md animate-pulse w-full"></div>
+                  <div className="h-[16px] bg-white/[0.04] rounded-md animate-pulse w-[85%]"></div>
+                  <div className="h-[16px] bg-white/[0.04] rounded-md animate-pulse w-[50%]"></div>
                 </div>
               ) : (
                 <div dangerouslySetInnerHTML={{ __html: renderMarkdownMath(m.content || "_(no response)_") }} />
@@ -1400,6 +1412,7 @@ function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setAct
   const fileRef = useRef(null);
   
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     const ta = taRef.current; if (!ta) return;
@@ -1414,10 +1427,16 @@ function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setAct
     setText(""); setImageData(null); setImagePreview(null); setPdfData(null); setPdfName(null); setActiveApp(null);
   };
 
-  const handleFile = (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) processFile(f);
+  };
+
+  const processFile = (f) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
@@ -1435,6 +1454,11 @@ function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setAct
       }
     };
     reader.readAsDataURL(f);
+  };
+
+  const handleFile = (e) => {
+    const f = e.target.files?.[0];
+    if (f) processFile(f);
   };
 
   return (
@@ -1458,7 +1482,18 @@ function Composer({ onSend, streaming, isResearchMode, onStop, activeApp, setAct
             </button>
           </div>
         )}
-        <div className="relative rounded-2xl bg-[#12151C] border border-white/[0.08] focus-within:border-white/[0.16] transition-colors shadow-2xl shadow-black/40">
+        <div 
+          className={`relative rounded-2xl bg-[#12151C] border transition-colors shadow-2xl shadow-black/40 overflow-hidden ${isDragging ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-white/[0.08] focus-within:border-white/[0.16]"}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDragging && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#12151C]/90 backdrop-blur-[2px] pointer-events-none border-2 border-dashed border-emerald-500/50 m-1 rounded-xl">
+              <FileText className="w-8 h-8 text-emerald-400 mb-2 animate-bounce" />
+              <span className="font-semibold text-emerald-400">Drop document here</span>
+            </div>
+          )}
           <textarea
             ref={taRef}
             data-testid="chat-input"
