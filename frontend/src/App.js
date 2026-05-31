@@ -1024,27 +1024,9 @@ function HomeDashboard({ user, setView, newChat, chats = [], openChat, onRequire
   const recentChats = chats.slice(0, 3);
   const totalChats = chats.length;
   const memoryCount = user?.unsafeMetadata?.re_memory?.length || 0;
-  const [showSpline, setShowSpline] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setShowSpline(true), 400);
-    return () => clearTimeout(t);
-  }, []);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-start pt-8 pb-32 px-5 overflow-y-auto animate-fadeUp">
-      {/* 3D Spline Header */}
-      <div className="w-full max-w-4xl h-[280px] md:h-[380px] rounded-[24px] md:rounded-[32px] overflow-hidden relative shadow-2xl bg-[#0A0C10] border border-white/[0.04] flex items-center justify-center">
-        <div className="absolute inset-0 pointer-events-auto">
-          {showSpline && (
-            <Spline 
-              scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" 
-              style={{ width: '100%', height: '100%' }}
-            />
-          )}
-        </div>
-      </div>
-
       <div className="w-full max-w-4xl mt-6">
         {!user ? (
           <div className="bg-[#0A0C10] rounded-[24px] p-8 border border-white/[0.06] shadow-xl text-center">
@@ -1227,13 +1209,15 @@ function Hero({ onPick, isResearchMode }) {
       
       {/* Mobile Home View */}
       <div className="md:hidden flex flex-col w-full h-full px-5 pt-8 pb-24 animate-fadeUp items-center justify-center">
-        <div className="w-full max-w-sm h-[280px] relative pointer-events-auto flex items-center justify-center">
-          {showSpline && (
-            <Spline 
-              scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" 
-              style={{ width: '100%', height: '100%' }}
-            />
-          )}
+        <div className="w-full max-w-sm h-[280px] relative pointer-events-auto flex items-center justify-center overflow-hidden">
+          <div className="absolute top-[-30px] left-[-30px] right-[-30px] bottom-[-60px]">
+            {showSpline && (
+              <Spline 
+                scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" 
+                style={{ width: '100%', height: '100%' }}
+              />
+            )}
+          </div>
         </div>
         <h1 className="text-[22px] font-bold text-white mt-8 tracking-tight text-center">
           What are we exploring?
