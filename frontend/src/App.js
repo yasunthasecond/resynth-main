@@ -47,7 +47,7 @@ import {
   History,
   Trophy,
 } from "lucide-react";
-import Spline from '@splinetool/react-spline';
+import ResynthMascot from './ResynthMascot';
 import { marked } from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
@@ -1020,10 +1020,10 @@ function GuestBanner({ usage, onSignIn }) {
 function HomeDashboard({ user, setView, newChat }) {
   return (
     <div className="w-full h-full flex flex-col items-center justify-start pt-8 pb-32 px-5 overflow-y-auto animate-fadeUp">
-      {/* 3D Spline Header */}
-      <div className="w-full max-w-4xl h-[280px] rounded-[32px] overflow-hidden relative shadow-2xl bg-[#0A0C10] border border-white/[0.04]">
-        <div className="absolute inset-0">
-          <Spline scene="https://prod.spline.design/6Wq1Q7YGyM-iab9i/scene.splinecode" />
+      {/* 3D Mascot Header */}
+      <div className="w-full max-w-4xl h-[380px] rounded-[32px] overflow-hidden relative shadow-2xl bg-[#0A0C10] border border-white/[0.04] flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <ResynthMascot size={380} />
         </div>
         
         {/* Overlay Content */}
