@@ -708,7 +708,7 @@ export default function App() {
         ) : view === "search" ? (
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
         ) : view === "home" ? (
-          <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} chats={chats} openChat={openChat} /></ErrorBoundary>
+          <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} chats={chats} openChat={openChat} onRequireAuth={() => setShowAuth(true)} /></ErrorBoundary>
         ) : view === "profile" ? (
           <ErrorBoundary><ProfileView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} showAlert={showAlert} /></ErrorBoundary>
         ) : (
@@ -1020,7 +1020,7 @@ function GuestBanner({ usage, onSignIn }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Home Dashboard
 // ────────────────────────────────────────────────────────────────────────────
-function HomeDashboard({ user, setView, newChat, chats = [], openChat }) {
+function HomeDashboard({ user, setView, newChat, chats = [], openChat, onRequireAuth }) {
   const recentChats = chats.slice(0, 3);
   const totalChats = chats.length;
   const memoryCount = user?.unsafeMetadata?.re_memory?.length || 0;
@@ -1037,44 +1037,61 @@ function HomeDashboard({ user, setView, newChat, chats = [], openChat }) {
         </div>
       </div>
 
-      <div className="w-full max-w-4xl mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* AI Review Card */}
-        <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-lg font-bold text-white">AI Weekly Review</h2>
+      <div className="w-full max-w-4xl mt-6">
+        {!user ? (
+          <div className="bg-[#0A0C10] rounded-[24px] p-8 border border-white/[0.06] shadow-xl text-center">
+            <h2 className="text-xl font-bold text-white mb-3">Sign in to unlock insights</h2>
+            <p className="text-textSecondary mb-6 max-w-md mx-auto">
+              Create an account to track your recent projects, expand your personalized AI knowledge graph, and access deep research tools.
+            </p>
+            <button 
+              onClick={onRequireAuth} 
+              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-xl transition-colors shadow-lg shadow-emerald-500/20"
+            >
+              Sign In / Sign Up
+            </button>
           </div>
-          <p className="text-sm text-textSecondary leading-relaxed mb-6">
-            You've started <strong className="text-white">{totalChats}</strong> conversations and expanded your knowledge graph with <strong className="text-white">{memoryCount}</strong> saved memories. Your intelligence engine is growing!
-          </p>
-          <button onClick={() => { setView('memory') }} className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl text-sm font-medium text-white transition-colors border border-white/[0.05]">
-            View Memory Insights
-          </button>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* AI Review Card */}
+            <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
+              <div className="flex items-center gap-3 mb-4">
+                <Sparkles className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-lg font-bold text-white">AI Weekly Review</h2>
+              </div>
+              <p className="text-sm text-textSecondary leading-relaxed mb-6">
+                You've started <strong className="text-white">{totalChats}</strong> conversations and expanded your knowledge graph with <strong className="text-white">{memoryCount}</strong> saved memories. Your intelligence engine is growing!
+              </p>
+              <button onClick={() => { setView('memory') }} className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl text-sm font-medium text-white transition-colors border border-white/[0.05]">
+                View Memory Insights
+              </button>
+            </div>
 
-        {/* Recent Projects */}
-        <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <History className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-lg font-bold text-white">Recent Projects</h2>
-          </div>
-          <div className="flex flex-col gap-2">
-            {recentChats.length > 0 ? recentChats.map((c, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]" onClick={() => { openChat(c.id); }}>
-                <span className="text-sm font-medium text-white/90 truncate mr-4">{c.title || "New Chat"}</span>
-                <span className="text-[11px] font-mono text-textSecondary/50 shrink-0 uppercase tracking-wider">
-                  {new Date(c.updatedAt || Date.now()).toLocaleDateString()}
-                </span>
+            {/* Recent Projects */}
+            <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl">
+              <div className="flex items-center gap-3 mb-4">
+                <History className="w-5 h-5 text-indigo-400" />
+                <h2 className="text-lg font-bold text-white">Recent Projects</h2>
               </div>
-            )) : (
-              <div className="py-4 text-center text-sm text-textSecondary/50">
-                No recent projects yet.
-                <button onClick={() => { setView('chat'); newChat(); }} className="mt-3 block w-full px-3 py-2 bg-white/[0.02] rounded-lg text-emerald-400 hover:bg-white/[0.05] transition-colors">Start a new chat</button>
+              <div className="flex flex-col gap-2">
+                {recentChats.length > 0 ? recentChats.map((c, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]" onClick={() => { openChat(c.id); }}>
+                    <span className="text-sm font-medium text-white/90 truncate mr-4">{c.title || "New Chat"}</span>
+                    <span className="text-[11px] font-mono text-textSecondary/50 shrink-0 uppercase tracking-wider">
+                      {new Date(c.updatedAt || Date.now()).toLocaleDateString()}
+                    </span>
+                  </div>
+                )) : (
+                  <div className="py-4 text-center text-sm text-textSecondary/50">
+                    No recent projects yet.
+                    <button onClick={() => { setView('chat'); newChat(); }} className="mt-3 block w-full px-3 py-2 bg-white/[0.02] rounded-lg text-emerald-400 hover:bg-white/[0.05] transition-colors">Start a new chat</button>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
