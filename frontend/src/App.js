@@ -1025,17 +1025,6 @@ function HomeDashboard({ user, setView, newChat }) {
         <div className="absolute inset-0">
           <Spline scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" />
         </div>
-        
-        {/* Overlay Content */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
-        <div className="absolute bottom-8 left-8 right-8 pointer-events-none">
-          <h1 className="text-3xl font-display font-bold text-white mb-2 tracking-tight">
-            Welcome back, {user ? (user.firstName || user.fullName || 'Yasuntha') : 'Yasuntha'}
-          </h1>
-          <p className="text-emerald-400 font-medium text-sm flex items-center gap-2">
-            <Trophy className="w-4 h-4" /> You're on a 5-day learning streak!
-          </p>
-        </div>
       </div>
 
       <div className="w-full max-w-4xl mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
