@@ -1910,8 +1910,22 @@ function ProfileView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations,
       <div className="w-full max-w-4xl flex flex-col gap-12">
         <section>
           <h2 className="text-2xl font-display font-bold text-white mb-6">Profile Settings</h2>
-          <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex justify-center md:justify-start">
-            <UserProfile routing="hash" appearance={{ elements: { rootBox: "w-full" } }} />
+          <div className="flex justify-center w-full overflow-hidden">
+            <UserProfile 
+              routing="hash" 
+              appearance={{ 
+                variables: {
+                  colorBackground: '#12151C',
+                  colorText: 'white',
+                  colorInputBackground: '#1A1D24',
+                  colorPrimary: '#34d399',
+                },
+                elements: { 
+                  rootBox: "w-full flex justify-center",
+                  card: "w-full max-w-[100vw] mx-auto m-0 shadow-xl border border-white/[0.08] bg-[#12151C]"
+                } 
+              }} 
+            />
           </div>
         </section>
         <section>
