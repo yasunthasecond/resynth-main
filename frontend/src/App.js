@@ -709,6 +709,8 @@ export default function App() {
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
         ) : view === "home" ? (
           <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} /></ErrorBoundary>
+        ) : view === "profile" ? (
+          <ErrorBoundary><ProfileView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} activeIntegrations={activeIntegrations} fetchIntegrations={fetchIntegrations} showAlert={showAlert} /></ErrorBoundary>
         ) : (
           <ErrorBoundary>
             <ChatPanel
@@ -736,7 +738,7 @@ export default function App() {
 
       {/* Mobile Bottom Navigation & FAB */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-[64px] bg-[#0A0C10] border-t border-white/[0.04] flex items-center justify-around px-2 z-[60] shadow-[0_-8px_30px_rgba(0,0,0,0.3)]">
-        <button onClick={() => setView('chat')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'chat' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
+        <button onClick={() => setView('home')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'home' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
           <Home className="w-5 h-5 mb-1" />
         </button>
         <button onClick={() => setView('notebooks')} className={`flex flex-col items-center justify-center w-12 h-12 transition-colors ${view === 'notebooks' ? 'text-emerald-400' : 'text-textSecondary hover:text-white'}`}>
@@ -794,9 +796,10 @@ function Sidebar({ open, onToggle, chats, folders, chatFolders, onCreateFolder, 
   );
 
   const items = [
+    { id: "home", label: "Home", icon: Home },
     { id: "search", label: "Search", icon: Search },
     { id: "notebooks", label: "Notebooks", icon: BookOpen, hideOnMobile: true },
-    { id: "integrations", label: "Integrations", icon: LayoutGrid },
+    { id: "integrations", label: "Integrations", icon: LayoutGrid, hideOnMobile: true },
     { id: "memory", label: "Memory", icon: Brain, hideOnMobile: true },
   ];
 
@@ -1861,9 +1864,38 @@ function PricingView({ isAuthed, authHeaders, billing, onRequireAuth }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Profile View
+// ────────────────────────────────────────────────────────────────────────────
+function ProfileView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations, fetchIntegrations, showAlert }) {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-start pt-8 pb-32 px-5 overflow-y-auto animate-fadeUp">
+      <div className="w-full max-w-4xl flex flex-col gap-12">
+        <section>
+          <h2 className="text-2xl font-display font-bold text-white mb-6">Profile Settings</h2>
+          <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 flex justify-center md:justify-start">
+            <UserProfile routing="hash" appearance={{ elements: { rootBox: "w-full" } }} />
+          </div>
+        </section>
+        <section>
+          <IntegrationsView 
+            isAuthed={isAuthed} 
+            authHeaders={authHeaders} 
+            onRequireAuth={onRequireAuth} 
+            activeIntegrations={activeIntegrations} 
+            fetchIntegrations={fetchIntegrations} 
+            showAlert={showAlert} 
+            isEmbedded={true}
+          />
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Integrations View
 // ────────────────────────────────────────────────────────────────────────────
-function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations, fetchIntegrations, showAlert }) {
+function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrations, fetchIntegrations, showAlert, isEmbedded = false }) {
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(null);
 
@@ -1901,8 +1933,8 @@ function IntegrationsView({ isAuthed, authHeaders, onRequireAuth, activeIntegrat
   };
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-10 animate-fadeUp">
-      <div className="max-w-4xl mx-auto">
+    <div className={isEmbedded ? "animate-fadeUp" : "flex-1 overflow-y-auto px-6 py-10 animate-fadeUp"}>
+      <div className={isEmbedded ? "w-full" : "max-w-4xl mx-auto"}>
         <h2 className="text-2xl font-bold font-display tracking-tight mb-2">Integrations</h2>
         <p className="text-textSecondary mb-10">Connect your favorite apps to give Resynth access to your private data and workflows.</p>
         
