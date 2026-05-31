@@ -1210,7 +1210,7 @@ function Hero({ onPick, isResearchMode }) {
       {/* Mobile Home View */}
       <div className="md:hidden flex flex-col w-full h-full px-5 pt-8 pb-24 animate-fadeUp items-center justify-center">
         <div className="w-full max-w-sm h-[280px] relative pointer-events-auto flex items-center justify-center overflow-hidden">
-          <div className="absolute top-[-30px] left-[-30px] right-[-30px] bottom-[-60px]">
+          <div className="absolute top-[-30px] left-[0px] right-[-60px] bottom-[-60px]">
             {showSpline && (
               <Spline 
                 scene="https://prod.spline.design/9oABQroW0inykN99/scene.splinecode" 
