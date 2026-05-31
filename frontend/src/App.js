@@ -44,7 +44,10 @@ import {
   PenSquare,
   User,
   Home,
+  History,
+  Trophy,
 } from "lucide-react";
+import Spline from '@splinetool/react-spline';
 import { marked } from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
@@ -240,7 +243,7 @@ export default function App() {
   };
 
   const [profile, setProfile] = useState({ plan: "free" });
-  const [view, setView] = useState("chat");
+  const [view, setView] = useState("home");
   const [chats, setChats] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [loadingChatId, setLoadingChatId] = useState(null);
@@ -704,6 +707,8 @@ export default function App() {
           <ErrorBoundary><NotebookView isAuthed={isAuthed} authHeaders={authHeaders} onRequireAuth={() => setShowAuth(true)} API={API} sendMessage={sendMessage} streaming={streaming} onStop={stopGeneration} showPrompt={showPrompt} showAlert={showAlert} /></ErrorBoundary>
         ) : view === "search" ? (
           <ErrorBoundary><SearchView chats={chats} onOpen={openChat} /></ErrorBoundary>
+        ) : view === "home" ? (
+          <ErrorBoundary><HomeDashboard user={profile} setView={setView} newChat={newChat} /></ErrorBoundary>
         ) : (
           <ErrorBoundary>
             <ChatPanel
@@ -1005,6 +1010,70 @@ function GuestBanner({ usage, onSignIn }) {
       <button onClick={onSignIn} className="text-emerald-400 hover:text-emerald-300 font-medium underline-offset-2 hover:underline">
         Sign in to save chats →
       </button>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Home Dashboard
+// ────────────────────────────────────────────────────────────────────────────
+function HomeDashboard({ user, setView, newChat }) {
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-start pt-8 pb-32 px-5 overflow-y-auto animate-fadeUp">
+      {/* 3D Spline Header */}
+      <div className="w-full max-w-4xl h-[280px] rounded-[32px] overflow-hidden relative shadow-2xl bg-[#0A0C10] border border-white/[0.04]">
+        <div className="absolute inset-0">
+          <Spline scene="https://prod.spline.design/6Wq1Q7YGyM-iab9i/scene.splinecode" />
+        </div>
+        
+        {/* Overlay Content */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+        <div className="absolute bottom-8 left-8 right-8 pointer-events-none">
+          <h1 className="text-3xl font-display font-bold text-white mb-2 tracking-tight">
+            Welcome back, {user ? (user.firstName || user.fullName || 'Yasuntha') : 'Yasuntha'}
+          </h1>
+          <p className="text-emerald-400 font-medium text-sm flex items-center gap-2">
+            <Trophy className="w-4 h-4" /> You're on a 5-day learning streak!
+          </p>
+        </div>
+      </div>
+
+      <div className="w-full max-w-4xl mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* AI Review Card */}
+        <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
+          <div className="flex items-center gap-3 mb-4">
+            <Sparkles className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-lg font-bold text-white">AI Weekly Review</h2>
+          </div>
+          <p className="text-sm text-textSecondary leading-relaxed mb-6">
+            This week you explored quantum computing logic and refined your React architecture. Your knowledge graph has expanded by 12 new core concepts.
+          </p>
+          <button onClick={() => { setView('memory') }} className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.1] rounded-xl text-sm font-medium text-white transition-colors border border-white/[0.05]">
+            View Insights
+          </button>
+        </div>
+
+        {/* Recent Projects */}
+        <div className="bg-[#0A0C10] rounded-[24px] p-6 border border-white/[0.06] shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <History className="w-5 h-5 text-indigo-400" />
+            <h2 className="text-lg font-bold text-white">Recent Projects</h2>
+          </div>
+          <div className="flex flex-col gap-2">
+            {[
+              { title: "Quantum Logic Research", time: "2 hours ago" },
+              { title: "Mobile UI Architecture", time: "Yesterday" },
+              { title: "Database Migration Plan", time: "3 days ago" }
+            ].map((proj, i) => (
+              <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/[0.04] transition-colors cursor-pointer border border-transparent hover:border-white/[0.05]" onClick={() => { setView('chat'); newChat(); }}>
+                <span className="text-sm font-medium text-white/90 truncate">{proj.title}</span>
+                <span className="text-xs text-textSecondary shrink-0">{proj.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

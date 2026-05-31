@@ -8,6 +8,8 @@
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.2",
     "@radix-ui/react-slot": "^1.1.0",
+    "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^1.12.95",
     "@supabase/supabase-js": "^2.105.4",
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
