@@ -52,7 +52,7 @@ import { marked } from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
 import katex from "katex";
-import { useUser, useAuth, SignIn, SignUp, UserButton } from "@clerk/clerk-react";
+import { useUser, useAuth, SignIn, SignUp, UserButton, UserProfile } from "@clerk/clerk-react";
 
 marked.use({
   renderer: {
